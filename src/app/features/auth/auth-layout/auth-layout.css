@@ -1,0 +1,61 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+.login-shell {
+  background: #f8f7fc;
+}
+
+.brand-panel {
+  background: #160b1c;
+}
+
+.brand-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image: linear-gradient(#9d85b2 1px, transparent 1px), linear-gradient(90deg, #9d85b2 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(135deg, transparent 6%, black 80%);
+}
+
+.brand-glow {
+  position: absolute;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.brand-glow-pink {
+  top: -13rem;
+  left: -11rem;
+  background: #b02baf;
+}
+
+.brand-glow-blue {
+  right: -15rem;
+  bottom: -11rem;
+  background: #0569db;
+}
+
+.brand-mark {
+  background: linear-gradient(115deg, #8b37bc 0%, #593fc9 55%, #256bd7 100%);
+}
+
+.brand-logo {
+  mix-blend-mode: screen;
+}
+
+.form-panel {
+  background: radial-gradient(circle at 88% 8%, #f4efff 0, transparent 32%), #fbfafe;
+}
+
+@media (max-width: 1023px) {
+  .brand-logo {
+    max-width: 24rem;
+  }
+}
