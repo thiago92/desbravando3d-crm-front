@@ -16,7 +16,8 @@ Não presumir que o escopo funcional, o modelo de dados ou o contrato da API já
 
 - A aplicação `desbravando3d-crm-front` foi criada com Angular 22.2, compatível com o Node instalado na máquina (`v22.23.3`).
 - O projeto usa componentes standalone, sem `app.module.ts`, e tem Angular Router configurado. `src/app/app.routes.ts` ainda não contém rotas.
-- O scaffold usa CSS e não inclui SSR nem geração estática. Tailwind CSS v4 e `spartan/ui` continuam planejados, mas ainda não foram instalados. O Spartan usa `@spartan-ng/brain` para comportamento e componentes Helm copiados para o código do projeto.
+- O scaffold usa CSS e não inclui SSR nem geração estática. Tailwind CSS v4 está instalado e configurado via PostCSS em `.postcssrc.json` e `src/styles.css`.
+- Spartan está instalado com `@spartan-ng/cli` e `@spartan-ng/brain`; o tema `neutral` foi inicializado em `src/styles.css`. Ainda não há componentes Helm gerados. O Spartan usa Brain para comportamento e copia os componentes Helm para o código do projeto quando forem selecionados.
 - O Angular CLI 22 está instalado globalmente na instalação ativa do Node. Nesta máquina, comandos `npm` e `ng` podem não ser encontrados no PowerShell; usar `npm.cmd` e `ng.cmd` ou o caminho completo dos executáveis quando necessário. A política de execução já bloqueou `npm.ps1`.
 - O projeto Angular está na subpasta `CRM.Front/desbravando3d-crm-front`, que tem seu próprio repositório Git. Este `AGENTS.md` fica na raiz dessa subpasta.
 
@@ -67,7 +68,7 @@ Dentro de cada feature, manter juntos seus componentes, modelos, serviços, esta
 
 ## Pontos ainda em aberto
 
-- Instalação e configuração de Tailwind CSS v4 e Spartan, incluindo o destino dos componentes Helm.
+- Destino dos componentes Helm do Spartan quando o primeiro componente for necessário.
 - Telas, etapas e estados das encomendas e das vendas consignadas.
 - Regras de cobrança, pagamentos parciais, saldos e relatórios.
 - Entidades, campos e relacionamentos do domínio.
