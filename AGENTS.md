@@ -18,6 +18,7 @@ Não presumir que o escopo funcional, o modelo de dados ou o contrato da API já
 - O projeto usa componentes standalone, sem `app.module.ts`, e tem Angular Router configurado. `src/app/app.routes.ts` ainda não contém rotas.
 - O scaffold usa CSS e não inclui SSR nem geração estática. Tailwind CSS v4 está instalado e configurado via PostCSS em `.postcssrc.json` e `src/styles.css`.
 - Spartan está instalado com `@spartan-ng/cli` e `@spartan-ng/brain`; o tema `neutral` foi inicializado em `src/styles.css`. Ainda não há componentes Helm gerados. O Spartan usa Brain para comportamento e copia os componentes Helm para o código do projeto quando forem selecionados.
+- O projeto usa Vitest para testes unitários. Executar uma vez com `npm.cmd run test:unit`; o workflow `.github/workflows/unit-tests.yml` executa os testes em pushes e pull requests. Adicionar testes de regras e interações à medida que os fluxos forem definidos, evitando testes que apenas repitam a implementação.
 - O Angular CLI 22 está instalado globalmente na instalação ativa do Node. Nesta máquina, comandos `npm` e `ng` podem não ser encontrados no PowerShell; usar `npm.cmd` e `ng.cmd` ou o caminho completo dos executáveis quando necessário. A política de execução já bloqueou `npm.ps1`.
 - O projeto Angular está na subpasta `CRM.Front/desbravando3d-crm-front`, que tem seu próprio repositório Git. Este `AGENTS.md` fica na raiz dessa subpasta.
 
@@ -76,3 +77,10 @@ Dentro de cada feature, manter juntos seus componentes, modelos, serviços, esta
 - Formato dos mocks e contratos da futura API.
 
 O portfólio de referência usa Tailwind v3; o setup atual do Spartan requer Tailwind v4. Reaproveitar ideias visuais e de organização, não copiar a configuração de estilos diretamente.
+
+## Ponto de retomada
+
+- O scaffold Angular está funcional. A compilação (`npm.cmd run build`) passou após a configuração de Tailwind e Spartan.
+- O Vitest já veio no scaffold. Os dois testes iniciais passaram com `npm.cmd run test:unit`. O script `test:unit` e o workflow do GitHub Actions para pushes e pull requests foram adicionados localmente; o workflow ainda não foi executado no GitHub.
+- Na última verificação, `main` estava um commit à frente de `origin/main`. Havia alterações locais em `AGENTS.md` e `package.json`, além do novo `.github/workflows/unit-tests.yml`. Conferir `git status` antes de continuar; nenhum commit ou push dessas alterações foi feito nesta etapa.
+- Próximo passo funcional: escolher com o usuário o primeiro fluxo (encomendas ou consignações) e definir etapas, dados necessários, ações e regras de valores recebidos e pendentes. Só então criar telas, mocks e testes de negócio. Nenhuma feature do CRM foi implementada ainda.
