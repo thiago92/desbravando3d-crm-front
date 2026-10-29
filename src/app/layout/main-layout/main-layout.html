@@ -1,68 +1,95 @@
-<div class="crm-shell" [class.crm-dark]="theme() === 'dark'">
-  <app-top-bar [menuOpen]="menuOpen()" (menuToggle)="toggleMenu()" />
+<div class="min-h-dvh bg-background text-foreground" hlmSidebarWrapper>
+  <hlm-sidebar srOnlySheetTitle="Menu do CRM" srOnlySheetDescription="Navegação pelas áreas do CRM">
+    <div hlmSidebarContent>
+      <nav aria-label="Navegação principal">
+        <div hlmSidebarGroup>
+          <div hlmSidebarGroupContent>
+            <ul hlmSidebarMenu>
+              <li hlmSidebarMenuItem>
+                <a hlmSidebarMenuButton routerLink="/inicio" routerLinkActive #dashboardActive="routerLinkActive" [routerLinkActiveOptions]="{ exact: true }" [isActive]="dashboardActive.isActive" tooltip="Dashboard">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11 12 4l9 7v9H3zM9 20v-6h6v6" /></svg>
+                  <span>Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
 
-  @if (menuOpen()) {
-    <button type="button" class="crm-menu-backdrop" aria-label="Fechar menu de navegação" (click)="closeMenu()"></button>
-  }
+        <div hlmSidebarGroup>
+          <div hlmSidebarGroupLabel>Operação</div>
+          <div hlmSidebarGroupContent>
+            <ul hlmSidebarMenu>
+              @for (item of operationItems; track item.route) {
+                <li hlmSidebarMenuItem>
+                  <a hlmSidebarMenuButton [routerLink]="item.route" routerLinkActive #itemActive="routerLinkActive" [isActive]="itemActive.isActive" [tooltip]="item.label">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
+                    <span>{{ item.label }}</span>
+                  </a>
+                </li>
+                @if (item.route === '/encomendas') {
+                  <li hlmSidebarMenuItem>
+                    <button hlmSidebarMenuButton type="button" disabled title="Disponível quando o site for integrado" class="text-sidebar-foreground/60">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM4 10h16M9 5v14" /></svg>
+                      <span>Encomendas do site</span>
+                      <span class="ml-auto text-[0.6rem]">Em breve</span>
+                    </button>
+                  </li>
+                }
+              }
+            </ul>
+          </div>
+        </div>
 
-  <aside id="crm-sidebar" class="crm-sidebar" [class.crm-sidebar-open]="menuOpen()" aria-label="Menu lateral">
-    <div class="crm-sidebar-content">
-      <div class="crm-sidebar-mobile-heading">
-        <span class="text-sm font-semibold">Menu</span>
-        <button type="button" class="crm-icon-button" aria-label="Fechar menu de navegação" (click)="closeMenu()">✕</button>
-      </div>
-
-      <nav aria-label="Navegação principal" class="crm-navigation">
-        <a routerLink="/inicio" routerLinkActive="crm-nav-active" [routerLinkActiveOptions]="{ exact: true }" class="crm-nav-link" (click)="closeMenu()">
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11 12 4l9 7v9H3zM9 20v-6h6v6" /></svg>
-          Dashboard
-        </a>
-
-        <p class="crm-nav-heading">Operação</p>
-        @for (item of operationItems; track item.route) {
-          <a [routerLink]="item.route" routerLinkActive="crm-nav-active" class="crm-nav-link" (click)="closeMenu()">
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
-            {{ item.label }}
-          </a>
-          @if (item.route === '/encomendas') {
-            <span class="crm-nav-link crm-nav-disabled" aria-disabled="true" title="Disponível quando o site for integrado">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM4 10h16M9 5v14" /></svg>
-              <span>Encomendas do site</span>
-              <span class="crm-soon-badge">Em breve</span>
-            </span>
-          }
-        }
-
-        <p class="crm-nav-heading">Gestão</p>
-        @for (item of managementItems; track item.route) {
-          <a [routerLink]="item.route" routerLinkActive="crm-nav-active" class="crm-nav-link" (click)="closeMenu()">
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
-            {{ item.label }}
-          </a>
-        }
+        <div hlmSidebarGroup>
+          <div hlmSidebarGroupLabel>Gestão</div>
+          <div hlmSidebarGroupContent>
+            <ul hlmSidebarMenu>
+              @for (item of managementItems; track item.route) {
+                <li hlmSidebarMenuItem>
+                  <a hlmSidebarMenuButton [routerLink]="item.route" routerLinkActive #itemActive="routerLinkActive" [isActive]="itemActive.isActive" [tooltip]="item.label">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
+                    <span>{{ item.label }}</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
       </nav>
     </div>
 
-    <div class="crm-sidebar-footer">
-      <div class="crm-profile">
-        <span class="crm-avatar" aria-hidden="true">P</span>
-        <div>
+    <div hlmSidebarFooter class="border-t border-sidebar-border p-3">
+      <div class="flex items-center gap-3 px-2 py-1 group-data-[collapsible=icon]:justify-center">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground" aria-hidden="true">P</span>
+        <div class="group-data-[collapsible=icon]:hidden">
           <p class="text-sm font-semibold">Perfil</p>
-          <p class="text-xs crm-muted">Modo prévia</p>
+          <p class="text-xs text-muted-foreground">Modo prévia</p>
         </div>
       </div>
-      <div class="crm-theme-control" role="group" aria-label="Tema da área interna">
-        <span class="text-sm font-medium">Tema</span>
-        <div class="crm-theme-options">
-          <button type="button" [attr.aria-pressed]="theme() === 'light'" [class.crm-theme-selected]="theme() === 'light'" (click)="setTheme('light')">Claro</button>
-          <button type="button" [attr.aria-pressed]="theme() === 'dark'" [class.crm-theme-selected]="theme() === 'dark'" (click)="setTheme('dark')">Escuro</button>
-        </div>
-      </div>
-      <a routerLink="/login" class="crm-exit-link" (click)="closeMenu()">Sair <span class="text-xs crm-muted">da prévia</span></a>
-    </div>
-  </aside>
 
-  <main class="crm-main">
-    <router-outlet />
+      <div class="px-2 group-data-[collapsible=icon]:hidden" role="group" aria-label="Tema da área interna">
+        <p class="mb-2 text-sm font-medium">Tema</p>
+        <div class="grid grid-cols-2 gap-1 rounded-md border border-sidebar-border p-1">
+          <button hlmBtn type="button" variant="ghost" size="sm" [attr.aria-pressed]="theme() === 'light'" class="aria-pressed:bg-sidebar-accent aria-pressed:text-sidebar-accent-foreground" (click)="setTheme('light')">Claro</button>
+          <button hlmBtn type="button" variant="ghost" size="sm" [attr.aria-pressed]="theme() === 'dark'" class="aria-pressed:bg-sidebar-accent aria-pressed:text-sidebar-accent-foreground" (click)="setTheme('dark')">Escuro</button>
+        </div>
+      </div>
+
+      <ul hlmSidebarMenu>
+        <li hlmSidebarMenuItem>
+          <a hlmSidebarMenuButton routerLink="/login" tooltip="Sair da prévia">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M10 17l5-5-5-5M15 12H3M12 4h8v16h-8" /></svg>
+            <span>Sair da prévia</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </hlm-sidebar>
+
+  <main hlmSidebarInset class="min-w-0">
+    <app-top-bar />
+    <div class="px-4 py-8 sm:px-6 lg:px-10">
+      <router-outlet />
+    </div>
   </main>
 </div>

@@ -7,11 +7,11 @@ Frontend de um CRM para uma empresa de impressão 3D. O objetivo é acompanhar e
 O projeto contém a base Angular e as primeiras telas de autenticação. Ainda não há autenticação real nem funcionalidades de negócio do CRM.
 
 - Angular 22 com componentes standalone e Angular Router.
-- CSS com Tailwind CSS v4 e tema `neutral` do Spartan. `@spartan-ng/brain` e o CLI do Spartan estão instalados; nenhum componente Helm foi gerado ainda.
+- CSS com Tailwind CSS v4 e tema `neutral` do Spartan. O menu lateral usa o Sidebar Helm gerado em `libs/ui/sidebar`, com os componentes de apoio do Spartan em `libs/ui/`.
 - Vitest configurado com testes de navegação e validação dos formulários, organizados por tela. O workflow em `.github/workflows/unit-tests.yml` executa todos os testes em pushes e pull requests.
 - Entrada, recuperação de senha e nova senha com um layout compartilhado, usando a logo em `public/brand/logo.jpg`.
 - A entrada da prévia é livre: um botão abre `/inicio` sem pedir e-mail ou senha. A área interna tem barra superior, menu lateral responsivo e páginas provisórias para os itens ativos; ainda não há telas de negócio.
-- O menu contém Dashboard, Produtos, Encomendas, Consignado, Clientes e lojas e Financeiro. “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada.
+- O menu contém Dashboard, Produtos, Encomendas, Consignado, Clientes e lojas e Financeiro. “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada. O Sidebar Helm do Spartan controla a apresentação responsiva e o recolhimento do menu.
 - A recuperação mostra uma confirmação de prévia sem enviar e-mail; a nova senha não valida o token nem altera a senha.
 - Sem backend, contas cadastradas ou autenticação real nesta etapa.
 

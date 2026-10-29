@@ -42,7 +42,7 @@ Não presumir que o escopo funcional, o modelo de dados ou o contrato da API já
 - A aplicação `desbravando3d-crm-front` foi criada com Angular 22.2, compatível com o Node instalado na máquina (`v22.23.3`).
 - O projeto usa componentes standalone, sem `app.module.ts`, e Angular Router. As rotas `/login`, `/recuperar-senha` e `/redefinir-senha` usam um layout de autenticação compartilhado em `src/app/features/auth/auth-layout/`.
 - O scaffold usa CSS e não inclui SSR nem geração estática. Tailwind CSS v4 está instalado e configurado via PostCSS em `.postcssrc.json` e `src/styles.css`.
-- Spartan está instalado com `@spartan-ng/cli` e `@spartan-ng/brain`; o tema `neutral` foi inicializado em `src/styles.css`. Ainda não há componentes Helm gerados. O Spartan usa Brain para comportamento e copia os componentes Helm para o código do projeto quando forem selecionados.
+- Spartan está instalado com `@spartan-ng/cli` e `@spartan-ng/brain`; o tema `neutral` foi inicializado em `src/styles.css`. O Sidebar Helm foi gerado em `libs/ui/sidebar`, com componentes de apoio em `libs/ui/` (Button, Input, Separator, Sheet, Skeleton, Tooltip e Utils). O destino e o estilo `vega` do gerador estão definidos em `components.json`. O menu interno usa esse Sidebar e seu controle responsivo; os componentes Helm copiados pertencem ao projeto e podem ser personalizados.
 - O projeto usa Vitest. Executar uma vez com `npm.cmd run test:unit`; o workflow `.github/workflows/unit-tests.yml` executa os testes em pushes e pull requests. `src/app/app.spec.ts` cobre a raiz e o redirecionamento inicial; cada tela de autenticação tem seu `*.spec.ts` ao lado do componente. Esses testes exercitam navegação e validação dos formulários. Manter os próximos testes próximos da respectiva feature e adicionar testes de regras e interações à medida que os fluxos forem definidos, evitando testes que apenas repitam a implementação.
 - O Angular CLI 22 está instalado globalmente na instalação ativa do Node. Nesta máquina, comandos `npm` e `ng` podem não ser encontrados no PowerShell; usar `npm.cmd` e `ng.cmd` ou o caminho completo dos executáveis quando necessário. A política de execução já bloqueou `npm.ps1`.
 - O projeto Angular está na subpasta `CRM.Front/desbravando3d-crm-front`, que tem seu próprio repositório Git. Este `AGENTS.md` fica na raiz dessa subpasta.
@@ -88,14 +88,13 @@ src/
     app.ts
   styles.css
 libs/
-  ui/                       # exemplo de destino configurável para Helm do Spartan
+  ui/                       # componentes Helm gerados pelo Spartan
 ```
 
 Dentro de cada feature, manter juntos seus componentes, modelos, serviços, estado e mocks. Separar dados mockados atrás de contratos claros para facilitar a futura troca pela API. Preferir rotas carregadas sob demanda quando as páginas forem criadas. Manter o código copiado do Spartan em seu destino configurado, separado dos componentes de negócio.
 
 ## Pontos ainda em aberto
 
-- Destino dos componentes Helm do Spartan quando o primeiro componente for necessário.
 - Telas e navegação de produtos, encomendas, consignações, histórico e dashboard; detalhes de cada etapa e ação.
 - Campos do cadastro de produtos e como o e-commerce reutilizará esses dados.
 - Representação de orçamento, aceite/recusa, impressão, entrega e pagamento das encomendas, incluindo pagamentos antecipados.

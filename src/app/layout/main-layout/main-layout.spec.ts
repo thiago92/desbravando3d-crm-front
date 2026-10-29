@@ -12,7 +12,10 @@ describe('MainLayout', () => {
     }).compileComponents();
   });
 
-  afterEach(() => localStorage.removeItem('crm-theme'));
+  afterEach(() => {
+    localStorage.removeItem('crm-theme');
+    document.documentElement.classList.remove('dark');
+  });
 
   it('navigates between preview sections and keeps the chosen theme', async () => {
     const fixture = TestBed.createComponent(App);
@@ -35,7 +38,7 @@ describe('MainLayout', () => {
     const darkButton = Array.from(compiled.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Escuro') as HTMLButtonElement;
     darkButton.click();
     fixture.detectChanges();
-    expect(compiled.querySelector('.crm-shell')?.classList.contains('crm-dark')).toBe(true);
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(localStorage.getItem('crm-theme')).toBe('dark');
 
     (compiled.querySelector('a[href="/login"]') as HTMLAnchorElement).click();

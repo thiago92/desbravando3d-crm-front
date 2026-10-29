@@ -1,18 +1,18 @@
-import { Component, signal, ViewEncapsulation } from '@angular/core';
+import { Component, DOCUMENT, effect, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
 import { TopBar } from './top-bar/top-bar';
 
 type Theme = 'light' | 'dark';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, TopBar],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, TopBar, HlmButton, ...HlmSidebarImports],
   templateUrl: './main-layout.html',
-  styleUrl: './main-layout.css',
-  encapsulation: ViewEncapsulation.None,
 })
 export class MainLayout {
-  protected readonly menuOpen = signal(false);
+  private readonly document = inject(DOCUMENT);
   protected readonly theme = signal<Theme>(this.initialTheme());
 
   protected readonly operationItems = [
@@ -26,12 +26,8 @@ export class MainLayout {
     { label: 'Financeiro', route: '/financeiro', icon: 'M3 7h18v12H3zM3 10h18M7 15h4' },
   ];
 
-  protected toggleMenu(): void {
-    this.menuOpen.update((open) => !open);
-  }
-
-  protected closeMenu(): void {
-    this.menuOpen.set(false);
+  constructor() {
+    effect(() => this.document.documentElement.classList.toggle('dark', this.theme() === 'dark'));
   }
 
   protected setTheme(theme: Theme): void {
