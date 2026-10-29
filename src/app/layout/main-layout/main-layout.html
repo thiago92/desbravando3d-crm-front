@@ -1,0 +1,68 @@
+<div class="crm-shell" [class.crm-dark]="theme() === 'dark'">
+  <app-top-bar [menuOpen]="menuOpen()" (menuToggle)="toggleMenu()" />
+
+  @if (menuOpen()) {
+    <button type="button" class="crm-menu-backdrop" aria-label="Fechar menu de navegação" (click)="closeMenu()"></button>
+  }
+
+  <aside id="crm-sidebar" class="crm-sidebar" [class.crm-sidebar-open]="menuOpen()" aria-label="Menu lateral">
+    <div class="crm-sidebar-content">
+      <div class="crm-sidebar-mobile-heading">
+        <span class="text-sm font-semibold">Menu</span>
+        <button type="button" class="crm-icon-button" aria-label="Fechar menu de navegação" (click)="closeMenu()">✕</button>
+      </div>
+
+      <nav aria-label="Navegação principal" class="crm-navigation">
+        <a routerLink="/inicio" routerLinkActive="crm-nav-active" [routerLinkActiveOptions]="{ exact: true }" class="crm-nav-link" (click)="closeMenu()">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 11 12 4l9 7v9H3zM9 20v-6h6v6" /></svg>
+          Dashboard
+        </a>
+
+        <p class="crm-nav-heading">Operação</p>
+        @for (item of operationItems; track item.route) {
+          <a [routerLink]="item.route" routerLinkActive="crm-nav-active" class="crm-nav-link" (click)="closeMenu()">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
+            {{ item.label }}
+          </a>
+          @if (item.route === '/encomendas') {
+            <span class="crm-nav-link crm-nav-disabled" aria-disabled="true" title="Disponível quando o site for integrado">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM4 10h16M9 5v14" /></svg>
+              <span>Encomendas do site</span>
+              <span class="crm-soon-badge">Em breve</span>
+            </span>
+          }
+        }
+
+        <p class="crm-nav-heading">Gestão</p>
+        @for (item of managementItems; track item.route) {
+          <a [routerLink]="item.route" routerLinkActive="crm-nav-active" class="crm-nav-link" (click)="closeMenu()">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
+            {{ item.label }}
+          </a>
+        }
+      </nav>
+    </div>
+
+    <div class="crm-sidebar-footer">
+      <div class="crm-profile">
+        <span class="crm-avatar" aria-hidden="true">P</span>
+        <div>
+          <p class="text-sm font-semibold">Perfil</p>
+          <p class="text-xs crm-muted">Modo prévia</p>
+        </div>
+      </div>
+      <div class="crm-theme-control" role="group" aria-label="Tema da área interna">
+        <span class="text-sm font-medium">Tema</span>
+        <div class="crm-theme-options">
+          <button type="button" [attr.aria-pressed]="theme() === 'light'" [class.crm-theme-selected]="theme() === 'light'" (click)="setTheme('light')">Claro</button>
+          <button type="button" [attr.aria-pressed]="theme() === 'dark'" [class.crm-theme-selected]="theme() === 'dark'" (click)="setTheme('dark')">Escuro</button>
+        </div>
+      </div>
+      <a routerLink="/login" class="crm-exit-link" (click)="closeMenu()">Sair <span class="text-xs crm-muted">da prévia</span></a>
+    </div>
+  </aside>
+
+  <main class="crm-main">
+    <router-outlet />
+  </main>
+</div>

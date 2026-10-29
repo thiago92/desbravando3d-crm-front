@@ -10,13 +10,14 @@ O projeto contém a base Angular e as primeiras telas de autenticação. Ainda n
 - CSS com Tailwind CSS v4 e tema `neutral` do Spartan. `@spartan-ng/brain` e o CLI do Spartan estão instalados; nenhum componente Helm foi gerado ainda.
 - Vitest configurado com testes de navegação e validação dos formulários, organizados por tela. O workflow em `.github/workflows/unit-tests.yml` executa todos os testes em pushes e pull requests.
 - Entrada, recuperação de senha e nova senha com um layout compartilhado, usando a logo em `public/brand/logo.jpg`.
-- A entrada da prévia é livre: um botão abre `/inicio` sem pedir e-mail ou senha. A página interna mostra uma barra superior com marca, título, indicador de prévia e opções; seu conteúdo ainda é provisório, sem telas de negócio.
+- A entrada da prévia é livre: um botão abre `/inicio` sem pedir e-mail ou senha. A área interna tem barra superior, menu lateral responsivo e páginas provisórias para os itens ativos; ainda não há telas de negócio.
+- O menu contém Dashboard, Produtos, Encomendas, Consignado, Clientes e lojas e Financeiro. “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada.
 - A recuperação mostra uma confirmação de prévia sem enviar e-mail; a nova senha não valida o token nem altera a senha.
 - Sem backend, contas cadastradas ou autenticação real nesta etapa.
 
 ## Direção do produto
 
-A interface deve ser limpa. A proposta inicial é usar uma barra superior com informações relevantes, menu lateral para navegação e, se fizer sentido após validação, um rodapé. O conteúdo dessas áreas e a identidade visual ainda serão definidos.
+A interface usa uma barra superior com marca e indicador de prévia; no celular, ela também abre o menu lateral. Os títulos ficam no conteúdo de cada página. O menu e seu rodapé foram definidos para a prévia, enquanto a identidade visual final ainda pode evoluir.
 
 A primeira versão prevê dois acessos individuais, para o usuário e sua esposa. Enquanto as telas são desenhadas, o acesso à prévia está livre e não identifica um usuário. O perfil inicialmente previsto é administrador, com uma estrutura preparada para outros perfis e permissões. O backend será responsável por determinar e validar o acesso por meio de token. O frontend usará as permissões recebidas para restringir rotas e ações. O formato do token e o contrato de autenticação ainda não foram definidos.
 
@@ -33,7 +34,8 @@ O dashboard pretendido reunirá gráficos de encomendas, vendas e arrecadação,
 ## Telas disponíveis
 
 - `/login`: botão de acesso livre à prévia do CRM.
-- `/inicio`: página temporária de chegada para o desenho da área interna.
+- `/inicio`: prévia do Dashboard.
+- `/produtos`, `/encomendas`, `/consignado`, `/clientes-lojas` e `/financeiro`: páginas provisórias de navegação, ainda sem funcionalidades de negócio.
 - `/recuperar-senha`: formulário de e-mail e confirmação de prévia.
 - `/redefinir-senha?token=...`: formulário de nova senha. Sem o parâmetro `token`, a tela orienta a solicitar outro link. A presença do parâmetro não significa que o token seja válido.
 
@@ -64,4 +66,4 @@ npm.cmd run build
 npm.cmd run test:unit
 ```
 
-`test:unit` executa os testes uma vez, sem modo de observação. `src/app/app.spec.ts` cobre a aplicação e o redirecionamento inicial. O teste da entrada cobre o acesso à prévia sem credenciais; recuperação e redefinição de senha têm arquivos `*.spec.ts` nas respectivas pastas. O comando encontra e executa todos eles; os próximos testes ficarão junto das funcionalidades que verificam.
+`test:unit` executa os testes uma vez, sem modo de observação. `src/app/app.spec.ts` cobre a aplicação e o redirecionamento inicial. Os testes da entrada e do layout cobrem o acesso à prévia, a navegação e a troca de tema; recuperação e redefinição de senha têm arquivos `*.spec.ts` nas respectivas pastas. O comando encontra e executa todos eles; os próximos testes ficarão junto das funcionalidades que verificam.

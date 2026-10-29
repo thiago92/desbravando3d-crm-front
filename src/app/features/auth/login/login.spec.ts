@@ -29,9 +29,10 @@ describe('Login', () => {
     fixture.detectChanges();
 
     expect(router.url).toBe('/inicio');
-    expect(compiled.textContent).toContain('Área interna em construção');
+    expect(compiled.querySelector('main h1')?.textContent).toContain('Dashboard');
     expect(compiled.querySelector('header')?.textContent).toContain('Desbravando 3D');
-    expect(compiled.querySelector('header')?.textContent).toContain('Início');
+    expect(compiled.querySelector('header')?.textContent).not.toContain('Início');
     expect(compiled.querySelector('header')?.textContent).toContain('Prévia');
+    expect(compiled.querySelector('nav')?.textContent).toContain('Encomendas do site');
   });
 });

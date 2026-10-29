@@ -1,11 +1,11 @@
-import { Component, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, input, output } from '@angular/core';
 
 @Component({
   selector: 'app-top-bar',
-  imports: [RouterLink],
   templateUrl: './top-bar.html',
+  styleUrl: './top-bar.css',
 })
 export class TopBar {
-  readonly title = input.required<string>();
+  readonly menuOpen = input(false);
+  readonly menuToggle = output<void>();
 }
