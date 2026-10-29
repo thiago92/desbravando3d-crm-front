@@ -26,6 +26,6 @@ describe('App', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(router.url).toBe('/login');
-    expect(compiled.querySelector('h2')?.textContent).toContain('Acesse sua conta');
+    expect(compiled.querySelector('h2')?.textContent).toContain('Vamos começar');
   });
 });

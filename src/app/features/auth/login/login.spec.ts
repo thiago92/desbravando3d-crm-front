@@ -11,7 +11,7 @@ describe('Login', () => {
     }).compileComponents();
   });
 
-  it('should require both credentials and never claim a login occurred in the preview', async () => {
+  it('opens the internal preview without credentials', async () => {
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
 
@@ -21,22 +21,17 @@ describe('Login', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    const form = compiled.querySelector('form') as HTMLFormElement;
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(compiled.querySelector('#email')).toBeNull();
+    expect(compiled.querySelector('#password')).toBeNull();
+
+    (compiled.querySelector('a[href="/inicio"]') as HTMLAnchorElement).click();
+    await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(compiled.textContent).toContain('Informe seu e-mail.');
-    expect(compiled.textContent).toContain('Informe sua senha.');
-
-    const email = compiled.querySelector('#email') as HTMLInputElement;
-    const password = compiled.querySelector('#password') as HTMLInputElement;
-    email.value = 'usuario@exemplo.com';
-    email.dispatchEvent(new Event('input', { bubbles: true }));
-    password.value = 'senha-de-teste';
-    password.dispatchEvent(new Event('input', { bubbles: true }));
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    fixture.detectChanges();
-
-    expect(compiled.textContent).toContain('Seus dados não foram enviados.');
+    expect(router.url).toBe('/inicio');
+    expect(compiled.textContent).toContain('Área interna em construção');
+    expect(compiled.querySelector('header')?.textContent).toContain('Desbravando 3D');
+    expect(compiled.querySelector('header')?.textContent).toContain('Início');
+    expect(compiled.querySelector('header')?.textContent).toContain('Prévia');
   });
 });

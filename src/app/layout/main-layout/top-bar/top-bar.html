@@ -1,0 +1,29 @@
+<header class="border-b border-slate-200 bg-white">
+  <div class="mx-auto flex h-[4.5rem] w-full max-w-[100rem] items-center gap-3 px-4 sm:px-6 lg:px-8">
+    <div class="flex min-w-0 flex-1 items-center gap-3">
+      <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-blue-600 text-sm font-bold text-white shadow-sm" aria-hidden="true">D</span>
+      <div class="hidden min-w-0 sm:block">
+        <p class="truncate text-sm font-semibold leading-5 text-slate-950">Desbravando 3D</p>
+        <p class="text-xs leading-4 text-slate-500">CRM</p>
+      </div>
+    </div>
+
+    <p class="min-w-0 truncate text-center text-sm font-semibold text-slate-800 sm:text-base">{{ title() }}</p>
+
+    <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
+      <span class="hidden rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wider text-violet-700 sm:inline-flex">Prévia</span>
+      <details class="relative">
+        <summary aria-label="Mais opções" class="flex size-9 cursor-pointer list-none items-center justify-center rounded-lg text-slate-600 outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-violet-500 [&::-webkit-details-marker]:hidden">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" class="size-5">
+            <circle cx="5" cy="12" r="1.75" />
+            <circle cx="12" cy="12" r="1.75" />
+            <circle cx="19" cy="12" r="1.75" />
+          </svg>
+        </summary>
+        <div class="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+          <a routerLink="/login" class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-violet-500">Voltar à entrada</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>

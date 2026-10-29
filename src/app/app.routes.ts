@@ -20,5 +20,9 @@ export const routes: Routes = [
       },
     ],
   },
+  {
+    path: 'inicio',
+    loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
+  },
   { path: '**', redirectTo: 'login' },
 ];

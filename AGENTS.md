@@ -14,18 +14,27 @@ Não presumir que o escopo funcional, o modelo de dados ou o contrato da API já
 
 ## Direção de interface e acesso
 
-- A identidade visual ainda não está fechada. A direção inicial é uma interface limpa, com barra superior para informações relevantes, menu lateral para navegação e possível rodapé. Definir o conteúdo dessas regiões e validar o layout com o usuário antes de implementar telas.
+- A identidade visual ainda não está fechada. O usuário aprovou uma barra superior simples com marca à esquerda, título da página ao centro e indicador de prévia e opções à direita. Ela foi implementada inicialmente na rota `/inicio`; o menu lateral será desenhado e validado em seguida. A necessidade de rodapé ainda está aberta.
 - A primeira versão prevê dois acessos individuais, para o usuário e sua esposa. O perfil inicialmente previsto é administrador; a estrutura deve permitir outros perfis e permissões no futuro sem espalhar verificações rígidas pelo código. Não fixar nomes, e-mails nem senhas no frontend.
 - O backend será a autoridade para autenticação e autorização. Ele determinará as permissões do usuário por meio de token; o formato do token, suas permissões e o contrato de autenticação ainda precisam ser definidos. O frontend deverá usar essas informações para bloquear rotas e ações indisponíveis, e o backend deverá validar cada operação protegida.
-- Enquanto o backend não existir, validar os fluxos de login e acesso com dados mockados atrás de contratos substituíveis. Não presumir credenciais, perfis adicionais ou uma matriz de permissões antes do alinhamento com o usuário.
+- Durante a definição das telas, o usuário optou por acesso livre à prévia do CRM: o botão de entrada não exige e-mail ou senha e leva à rota `/inicio`. Isso não representa autenticação nem sessão de usuário. Reintroduzir o fluxo real quando o contrato com o backend for definido, sem presumir credenciais, perfis adicionais ou matriz de permissões.
 - A recuperação de senha terá solicitação por e-mail e uma tela para definir nova senha acessada por link com token. O backend deverá conferir o e-mail, enviar o link e validar o token antes de alterar a senha. A resposta de solicitação prevista pelo usuário é HTTP 200; o contrato completo e as regras de expiração e uso do token ainda não foram definidos. A interface deve evitar revelar se um e-mail está cadastrado.
 - Manter este `AGENTS.md` e o `README.md` atualizados conforme decisões e funcionalidades forem validadas. O README deve descrever o estado real do projeto, não funcionalidades apenas planejadas como se já estivessem implementadas.
 
 ## Fluxos de negócio em definição
 
-- Consignação: lojas parceiras recebem produtos da empresa. O pagamento desses produtos depende de sua venda pela loja. A entrega à loja, a venda informada e o pagamento recebido devem ser tratados como acontecimentos distintos no controle do CRM.
-- O usuário quer acompanhar encomendas, produtos ainda em consignação, itens vendidos, valores ainda não pagos e um dashboard. As telas e indicadores ainda precisam ser detalhados antes da implementação.
-- Alinhar como registrar entregas, quantidades, vendas, devoluções, repasses e pagamentos antes de definir entidades, estados ou cálculos da consignação.
+- Produtos: o CRM precisará permitir o cadastro de produtos. O mesmo cadastro deverá servir futuramente ao e-commerce; ainda não foram definidos os campos, as variações nem quais produtos estarão disponíveis em cada canal. Não implementar um modelo definitivo sem alinhar esse compartilhamento.
+- Consignação: clientes que possuem lojas encomendam produtos, que são deixados na loja para venda. O CRM deve mostrar quais produtos e quantidades estão em cada loja, quais foram vendidos e quais vendas já tiveram o valor recebido pela empresa. A entrega à loja, a venda informada e o recebimento são acontecimentos distintos; uma venda não implica pagamento automático.
+- Encomendas: um usuário cadastra a solicitação inicialmente, podendo precificá-la depois e apresentar um orçamento. O cliente aceita ou recusa o orçamento. Quando aceita, é necessário acompanhar pelo menos a confirmação, a impressão, a conclusão da impressão, a entrega e o pagamento. O pagamento pode ocorrer antes da entrega. Ainda não foi decidido se cada informação será representada por estado, data ou outro registro; evitar uma sequência rígida que force pagamento apenas no fim.
+- Histórico de ações: como haverá inicialmente dois usuários, o usuário quer identificar quem realizou cada ação relevante nas encomendas e demais operações. Definir quais eventos entram no histórico, o nível de detalhe e a forma de exibição antes da implementação. Não confundir histórico de alterações com o estado atual do pedido.
+- Dashboard: a intenção é acompanhar gráficos de encomendas, vendas e arrecadação, distinguindo consignação, vendas em feiras e encomendas do dia a dia. Entre as origens mencionadas estão colegas de trabalho, Instagram e feiras. Indicadores, filtros, períodos e regras de cálculo ainda serão definidos.
+- Alinhar como registrar entregas, quantidades, vendas, devoluções, repasses, pagamentos parciais e correções antes de definir entidades, estados ou cálculos da consignação.
+
+## Integração futura com e-commerce
+
+- A intenção é ter dois frontends (CRM e e-commerce), duas APIs e um banco de dados compartilhado. O foco atual é o CRM; o e-commerce ainda não será implementado nesta etapa.
+- O cadastro de produtos será utilizado pelos dois sistemas. Documentar essa necessidade ao desenhar o fluxo e os contratos, sem presumir agora que as duas APIs terão os mesmos endpoints ou que o frontend acessará o banco diretamente.
+- A definição de propriedade dos dados, sincronização, segurança e contratos entre as APIs fica para a etapa de backend. O frontend deve manter mocks substituíveis para os fluxos validados.
 
 ## Tecnologia e decisões atuais
 
@@ -67,6 +76,7 @@ src/
     layout/
       main-layout/
     features/
+      produtos/            # cadastro compartilhável com o e-commerce futuro
       encomendas/
       consignacoes/
       pagamentos/           # ou financeiro, conforme o domínio for definido
@@ -85,7 +95,11 @@ Dentro de cada feature, manter juntos seus componentes, modelos, serviços, esta
 ## Pontos ainda em aberto
 
 - Destino dos componentes Helm do Spartan quando o primeiro componente for necessário.
-- Telas, etapas e estados das encomendas e das vendas consignadas.
+- Telas e navegação de produtos, encomendas, consignações, histórico e dashboard; detalhes de cada etapa e ação.
+- Campos do cadastro de produtos e como o e-commerce reutilizará esses dados.
+- Representação de orçamento, aceite/recusa, impressão, entrega e pagamento das encomendas, incluindo pagamentos antecipados.
+- Escopo do histórico de ações: eventos, autor, data, alterações registradas e visualização.
+- Categorias de origem das vendas/encomendas e regras dos gráficos e indicadores.
 - Regras de cobrança, pagamentos parciais, saldos e relatórios.
 - Entidades, campos e relacionamentos do domínio.
 - Conteúdo da barra superior, itens do menu lateral, necessidade de rodapé e identidade visual final.
@@ -100,5 +114,6 @@ O portfólio de referência usa Tailwind v3; o setup atual do Spartan requer Tai
 
 - O scaffold Angular está funcional. A compilação (`npm.cmd run build`) passou após a configuração de Tailwind e Spartan.
 - O Vitest já veio no scaffold. Os cinco testes distribuídos em quatro arquivos passaram com `npm.cmd run test:unit`, incluindo navegação e validação dos formulários de autenticação. O workflow do GitHub Actions para pushes e pull requests está configurado; a execução no GitHub ainda não foi verificada nesta conversa.
-- As telas de login, solicitação de recuperação e nova senha foram criadas com layout visual compartilhado e validação local. A confirmação de recuperação é apenas uma prévia: nenhum e-mail é enviado. A tela de nova senha verifica apenas a presença do parâmetro `token` e a confirmação da senha; nenhum token é validado e nenhuma senha é alterada no frontend.
-- Próximos alinhamentos: detalhar o layout interno e a navegação, escolher o primeiro fluxo de negócio (encomendas ou consignações) com etapas, dados, ações e regras financeiras, e posteriormente definir os contratos de autenticação e recuperação com o backend. Nenhuma funcionalidade de negócio do CRM foi implementada ainda.
+- A entrada agora oferece acesso livre à rota temporária `/inicio`, sem e-mail ou senha. A página interna mostra a barra superior aprovada e um conteúdo provisório; não há autenticação ou sessão. As telas de recuperação e nova senha permanecem como prévia: nenhum e-mail é enviado, nenhum token é validado e nenhuma senha é alterada no frontend.
+- O usuário descreveu uma primeira visão para produtos, consignação, encomendas, histórico de ações e dashboard. Essas direções estão acima, mas telas, dados, estados e cálculos ainda dependem de alinhamento. Nenhuma funcionalidade de negócio do CRM foi implementada ainda.
+- Próximos alinhamentos: validar o layout interno e a navegação, detalhar o cadastro de produtos e o primeiro fluxo de negócio com ações e regras financeiras, e posteriormente definir os contratos de autenticação e recuperação com o backend.
