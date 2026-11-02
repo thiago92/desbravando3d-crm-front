@@ -35,6 +35,15 @@ export const routes: Routes = [
         data: { title: 'Produtos', description: 'O cadastro será desenhado para atender ao CRM e ao futuro e-commerce.' },
       },
       {
+        path: 'insumos',
+        loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
+        data: { title: 'Insumos', description: 'Aqui serão cadastrados os filamentos e acompanhados os saldos disponíveis, reservados e consumidos.' },
+      },
+      {
+        path: 'calculadora',
+        loadComponent: () => import('./features/calculadora/calculadora').then((module) => module.Calculadora),
+      },
+      {
         path: 'encomendas',
         loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
         data: { title: 'Encomendas', description: 'O fluxo de solicitação, orçamento, produção, entrega e pagamento será detalhado antes desta tela.' },

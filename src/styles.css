@@ -7,6 +7,27 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@keyframes crm-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.crm-route-content > router-outlet + * {
+  animation: crm-page-enter 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crm-route-content > router-outlet + * {
+    animation: none;
+  }
+}
+
 :root {
 color-scheme: light;
 

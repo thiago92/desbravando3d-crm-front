@@ -15,46 +15,60 @@
           </div>
         </div>
 
-        <div hlmSidebarGroup>
-          <div hlmSidebarGroupLabel>Operação</div>
-          <div hlmSidebarGroupContent>
-            <ul hlmSidebarMenu>
-              @for (item of operationItems; track item.route) {
-                <li hlmSidebarMenuItem>
-                  <a hlmSidebarMenuButton [routerLink]="item.route" routerLinkActive #itemActive="routerLinkActive" [isActive]="itemActive.isActive" [tooltip]="item.label">
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
-                    <span>{{ item.label }}</span>
-                  </a>
-                </li>
-                @if (item.route === '/encomendas') {
-                  <li hlmSidebarMenuItem>
-                    <button hlmSidebarMenuButton type="button" disabled title="Disponível quando o site for integrado" class="text-sidebar-foreground/60">
-                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM4 10h16M9 5v14" /></svg>
-                      <span>Encomendas do site</span>
-                      <span class="ml-auto text-[0.6rem]">Em breve</span>
-                    </button>
-                  </li>
-                }
-              }
-            </ul>
+        <hlm-collapsible [expanded]="true" class="group/collapsible">
+          <div hlmSidebarGroup>
+            <button hlmCollapsibleTrigger hlmSidebarGroupLabel type="button" class="w-full cursor-pointer transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground motion-reduce:transition-none">
+              Operação
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" /></svg>
+            </button>
+            <hlm-collapsible-content>
+              <div hlmSidebarGroupContent class="min-h-0 overflow-hidden">
+                <ul hlmSidebarMenu>
+                  @for (item of operationItems; track item.route) {
+                    <li hlmSidebarMenuItem>
+                      <a hlmSidebarMenuButton [routerLink]="item.route" routerLinkActive #itemActive="routerLinkActive" [isActive]="itemActive.isActive" [tooltip]="item.label" class="transition-colors duration-150 motion-reduce:transition-none">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
+                        <span>{{ item.label }}</span>
+                      </a>
+                    </li>
+                    @if (item.route === '/encomendas') {
+                      <li hlmSidebarMenuItem>
+                        <button hlmSidebarMenuButton type="button" disabled title="Disponível quando o site for integrado" class="text-sidebar-foreground/60">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM4 10h16M9 5v14" /></svg>
+                          <span>Encomendas do site</span>
+                          <span class="ml-auto text-[0.6rem]">Em breve</span>
+                        </button>
+                      </li>
+                    }
+                  }
+                </ul>
+              </div>
+            </hlm-collapsible-content>
           </div>
-        </div>
+        </hlm-collapsible>
 
-        <div hlmSidebarGroup>
-          <div hlmSidebarGroupLabel>Gestão</div>
-          <div hlmSidebarGroupContent>
-            <ul hlmSidebarMenu>
-              @for (item of managementItems; track item.route) {
-                <li hlmSidebarMenuItem>
-                  <a hlmSidebarMenuButton [routerLink]="item.route" routerLinkActive #itemActive="routerLinkActive" [isActive]="itemActive.isActive" [tooltip]="item.label">
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
-                    <span>{{ item.label }}</span>
-                  </a>
-                </li>
-              }
-            </ul>
+        <hlm-collapsible [expanded]="true" class="group/collapsible">
+          <div hlmSidebarGroup>
+            <button hlmCollapsibleTrigger hlmSidebarGroupLabel type="button" class="w-full cursor-pointer transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground motion-reduce:transition-none">
+              Gestão
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" /></svg>
+            </button>
+            <hlm-collapsible-content>
+              <div hlmSidebarGroupContent class="min-h-0 overflow-hidden">
+                <ul hlmSidebarMenu>
+                  @for (item of managementItems; track item.route) {
+                    <li hlmSidebarMenuItem>
+                      <a hlmSidebarMenuButton [routerLink]="item.route" routerLinkActive #itemActive="routerLinkActive" [isActive]="itemActive.isActive" [tooltip]="item.label" class="transition-colors duration-150 motion-reduce:transition-none">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" /></svg>
+                        <span>{{ item.label }}</span>
+                      </a>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </hlm-collapsible-content>
           </div>
-        </div>
+        </hlm-collapsible>
       </nav>
     </div>
 
@@ -88,7 +102,7 @@
 
   <main hlmSidebarInset class="min-w-0">
     <app-top-bar />
-    <div class="px-4 py-8 sm:px-6 lg:px-10">
+    <div class="crm-route-content px-4 py-8 sm:px-6 lg:px-10">
       <router-outlet />
     </div>
   </main>

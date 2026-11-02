@@ -35,6 +35,12 @@ describe('MainLayout', () => {
     expect(router.url).toBe('/produtos');
     expect(compiled.querySelector('main h1')?.textContent).toBe('Produtos');
 
+    (compiled.querySelector('a[href="/insumos"]') as HTMLAnchorElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(router.url).toBe('/insumos');
+    expect(compiled.querySelector('main h1')?.textContent).toBe('Insumos');
+
     const darkButton = Array.from(compiled.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Escuro') as HTMLButtonElement;
     darkButton.click();
     fixture.detectChanges();
@@ -45,5 +51,31 @@ describe('MainLayout', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(router.url).toBe('/login');
+  });
+
+  it('expands and collapses the navigation groups', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+
+    await router.navigateByUrl('/inicio');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const operation = Array.from(compiled.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Operação') as HTMLButtonElement;
+    const management = Array.from(compiled.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Gestão') as HTMLButtonElement;
+
+    expect(operation.getAttribute('aria-expanded')).toBe('true');
+    expect(management.getAttribute('aria-expanded')).toBe('true');
+
+    operation.click();
+    fixture.detectChanges();
+    expect(operation.getAttribute('aria-expanded')).toBe('false');
+    expect(management.getAttribute('aria-expanded')).toBe('true');
+
+    operation.click();
+    fixture.detectChanges();
+    expect(operation.getAttribute('aria-expanded')).toBe('true');
   });
 });
