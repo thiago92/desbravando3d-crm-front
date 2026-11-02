@@ -63,6 +63,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
         data: { title: 'Financeiro', description: 'Valores recebidos e pendentes serão apresentados após a definição das regras de pagamento.' },
       },
+      {
+        path: 'log',
+        loadComponent: () => import('./features/log/log').then((module) => module.Log),
+      },
     ],
   },
   { path: '**', redirectTo: 'login' },

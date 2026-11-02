@@ -1,0 +1,54 @@
+<section class="mx-auto max-w-6xl">
+  <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Prévia do CRM</p>
+  <h1 class="mt-3 text-3xl font-semibold tracking-tight">Log de alterações</h1>
+  <p class="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Consulte o histórico completo dos registros por período. Os eventos abaixo são exemplos para validar os filtros; ainda não há autenticação nem alterações reais registradas.</p>
+
+  <div class="mt-8 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+      <label class="block text-sm font-medium">
+        Buscar em todos os campos
+        <input type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="Ex.: Maria, filamento, 700 g" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      </label>
+      <label class="block text-sm font-medium">
+        Data inicial <span aria-hidden="true">*</span>
+        <input type="date" required [ngModel]="start()" (ngModelChange)="start.set($event)" [max]="end() || null" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      </label>
+      <label class="block text-sm font-medium">
+        Data final <span aria-hidden="true">*</span>
+        <input type="date" required [ngModel]="end()" (ngModelChange)="end.set($event)" [min]="start() || null" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      </label>
+    </div>
+    @if (invalidPeriod()) {
+      <p class="mt-3 text-sm text-destructive" role="alert">Informe um período válido com data inicial e final para consultar os logs.</p>
+    } @else {
+      <p class="mt-3 text-xs text-muted-foreground">Período obrigatório · {{ events().length }} {{ events().length === 1 ? 'evento encontrado' : 'eventos encontrados' }}</p>
+    }
+  </div>
+
+  @if (!invalidPeriod()) {
+    <div class="mt-6 space-y-3" aria-live="polite">
+      @for (event of events(); track event.id) {
+        <article class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">{{ event.action }}</span>
+                <span class="text-xs text-muted-foreground">{{ event.area }} · {{ event.record }}</span>
+              </div>
+              <h2 class="mt-3 text-base font-semibold">{{ event.summary }}</h2>
+            </div>
+            <time class="text-xs text-muted-foreground" [attr.datetime]="event.occurredAt">{{ formatDate(event.occurredAt) }}</time>
+          </div>
+          <p class="mt-2 text-sm text-muted-foreground">Por {{ event.actor }}</p>
+          <ul class="mt-4 space-y-1 border-t border-border pt-4 text-sm">
+            @for (change of event.changes; track change.field) {
+              <li><span class="font-medium">{{ change.field }}:</span> @if (change.before) { <span class="text-muted-foreground">{{ change.before }} → </span> }{{ change.after }}</li>
+            }
+          </ul>
+        </article>
+      } @empty {
+        <div class="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhum log encontrado para este período e busca.</div>
+      }
+    </div>
+  }
+</section>

@@ -27,6 +27,7 @@ export class MainLayout {
   protected readonly managementItems = [
     { label: 'Clientes e lojas', route: '/clientes-lojas', icon: 'M16 19H4v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2zM10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 8a3 3 0 0 1 0 6M20 19v-2a4 4 0 0 0-2-3.46' },
     { label: 'Financeiro', route: '/financeiro', icon: 'M3 7h18v12H3zM3 10h18M7 15h4' },
+    { label: 'Log', route: '/log', icon: 'M5 3h14v18H5zM8 8h8M8 12h8M8 16h5' },
   ];
 
   constructor() {

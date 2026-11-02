@@ -11,7 +11,7 @@ O projeto contém a base Angular e as telas de acesso da prévia. Ainda não há
 - Vitest configurado com testes de navegação e validação dos formulários, organizados por tela. O workflow em `.github/workflows/unit-tests.yml` executa todos os testes em pushes e pull requests.
 - Entrada, recuperação de senha e nova senha com um layout compartilhado, usando a logo em `public/brand/logo.jpg`.
 - A entrada da prévia é livre: um botão abre `/inicio` sem pedir e-mail ou senha. A área interna tem barra superior, menu lateral responsivo e páginas provisórias, incluindo a rota da Calculadora.
-- O menu contém Dashboard, Produtos, Insumos, Calculadora, Encomendas, Consignado, Clientes e lojas e Financeiro. Operação e Gestão são grupos expansíveis com transição; “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada. Sidebar e Collapsible Helm do Spartan controlam a navegação e os grupos expansíveis.
+- O menu contém Dashboard, Produtos, Insumos, Calculadora, Encomendas, Consignado, Clientes e lojas, Financeiro e Log. Operação e Gestão são grupos expansíveis com transição; “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada. Sidebar e Collapsible Helm do Spartan controlam a navegação e os grupos expansíveis.
 - As páginas internas entram com uma transição curta. A interface respeita a preferência do sistema por movimento reduzido; transições discretas serão consideradas também nas próximas telas.
 - A recuperação mostra uma confirmação de prévia sem enviar e-mail; a nova senha não valida o token nem altera a senha.
 - A rota Calculadora permanece no menu, mas sua tela contém apenas o título; será reconstruída passo a passo com o usuário.
@@ -28,6 +28,10 @@ O fluxo planejado de recuperação solicita o e-mail e mostra uma resposta gené
 O CRM deverá incluir um cadastro de produtos que também será aproveitado pelo e-commerce futuro. A arquitetura pretendida tem dois frontends, duas APIs e um banco de dados compartilhado. Nesta etapa, o trabalho está concentrado no frontend do CRM; os contratos e a divisão de responsabilidades entre as APIs ainda não foram definidos.
 
 Na consignação, clientes com lojas encomendam produtos que ficam nas lojas para venda. O controle desejado é saber quais produtos e quantidades estão em cada loja, quais foram vendidos e quais valores já foram recebidos. Entrega à loja, venda e recebimento devem ser registrados separadamente.
+
+### Auditoria planejada
+
+O usuário definiu que os registros alteráveis deverão guardar `userCreateId`, `userUpdateId` e uma string `log` com a descrição da alteração mais recente. Na criação, essa descrição indicará a criação; cada atualização a substituirá. Uma tabela de histórico separada deverá preservar todos os eventos, com autor e data, da criação em diante. A tela `/log` usa eventos de exemplo para validar a busca textual em todos os dados do evento, inclusive valores anteriores e novos, e exige um período válido. Ela abre com os últimos 30 dias selecionados. O período inicial, a abrangência exata da busca e os detalhes dos eventos ainda podem ser ajustados. A prévia não registra alterações reais nem identifica usuários.
 
 Nas encomendas, a solicitação pode ser cadastrada antes de ter preço. Depois vem a precificação e o orçamento, seguido da resposta do cliente. Para encomendas aceitas, o acompanhamento deve mostrar confirmação, andamento da impressão, conclusão, entrega e pagamento. O cliente pode pagar antes de receber. Como haverá inicialmente dois usuários, também é desejado um histórico que mostre quem realizou as ações relevantes. A representação desses acontecimentos e o conteúdo do histórico ainda serão definidos.
 
@@ -52,6 +56,7 @@ O dashboard pretendido reunirá gráficos de encomendas, vendas e arrecadação,
 - `/login`: botão de acesso livre à prévia do CRM.
 - `/inicio`: prévia do Dashboard.
 - `/calculadora`: página vazia com título, aguardando definição passo a passo.
+- `/log`: prévia do histórico de alterações com dados de exemplo, busca textual e filtro obrigatório por período.
 - `/produtos`, `/insumos`, `/encomendas`, `/consignado`, `/clientes-lojas` e `/financeiro`: páginas provisórias de navegação, ainda sem funcionalidades de negócio.
 - `/recuperar-senha`: formulário de e-mail e confirmação de prévia.
 - `/redefinir-senha?token=...`: formulário de nova senha. Sem o parâmetro `token`, a tela orienta a solicitar outro link. A presença do parâmetro não significa que o token seja válido.
