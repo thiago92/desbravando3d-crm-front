@@ -1,0 +1,68 @@
+<section class="mt-10 border-t border-border pt-10" aria-labelledby="print-calculator-heading">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h2 id="print-calculator-heading" class="text-2xl font-semibold tracking-tight">Calculadora de impressão 3D</h2>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Simule o preço de uma peça com os valores informados agora. Esta simulação não usa os percentuais nem as taxas cadastradas acima.</p>
+    </div>
+    @if (hasAnyInput()) {
+      <button type="button" (click)="clear()" class="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm font-medium transition-colors hover:bg-accent motion-reduce:transition-none">Limpar campos</button>
+    }
+  </div>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.85fr)] lg:items-start">
+    <div class="space-y-4">
+      <div class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <h3 class="text-lg font-semibold">Filamento e impressão</h3>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <label class="block text-sm font-medium" for="calc-filament-price">Preço do filamento (R$/kg)
+            <input id="calc-filament-price" type="number" min="0" step="any" inputmode="decimal" [ngModel]="inputs().filamentPricePerKg" (ngModelChange)="setInput('filamentPricePerKg', $event)" placeholder="Ex.: 120" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </label>
+          <label class="block text-sm font-medium" for="calc-filament-grams">Material usado (g)
+            <input id="calc-filament-grams" type="number" min="0" step="any" inputmode="decimal" [ngModel]="inputs().filamentGrams" (ngModelChange)="setInput('filamentGrams', $event)" placeholder="Ex.: 50" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </label>
+          <label class="block text-sm font-medium" for="calc-print-hours">Duração da impressão (horas)
+            <input id="calc-print-hours" type="number" min="0" step="any" inputmode="decimal" [ngModel]="inputs().printHours" (ngModelChange)="setInput('printHours', $event)" placeholder="Ex.: 4" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </label>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <h3 class="text-lg font-semibold">Energia</h3>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <label class="block text-sm font-medium" for="calc-average-power">Consumo médio da impressora (W)
+            <input id="calc-average-power" type="number" min="0" step="any" inputmode="decimal" [ngModel]="inputs().averagePowerW" (ngModelChange)="setInput('averagePowerW', $event)" placeholder="Ex.: 150" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </label>
+          <label class="block text-sm font-medium" for="calc-energy-tariff">Tarifa de energia (R$/kWh)
+            <input id="calc-energy-tariff" type="number" min="0" step="any" inputmode="decimal" [ngModel]="inputs().tariffPerKwh" (ngModelChange)="setInput('tariffPerKwh', $event)" placeholder="Ex.: 0.80" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+          </label>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <h3 class="text-lg font-semibold">Preço sugerido</h3>
+        <label class="mt-5 block max-w-xs text-sm font-medium" for="calc-markup">Margem de lucro (%)
+          <input id="calc-markup" type="number" min="0" step="any" inputmode="decimal" [ngModel]="inputs().markupPercent" (ngModelChange)="setInput('markupPercent', $event)" placeholder="Ex.: 500" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        </label>
+        <p class="mt-2 text-xs leading-5 text-muted-foreground">Neste cálculo, a margem informada é um acréscimo sobre material + energia: 500% multiplica o custo direto por 6.</p>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-border bg-card p-5 shadow-sm lg:sticky lg:top-6 sm:p-6" aria-live="polite">
+      <h3 class="text-lg font-semibold">Resultados</h3>
+      @if (result(); as calculation) {
+        <dl class="mt-5 space-y-3 text-sm">
+          <div class="flex justify-between gap-4"><dt class="text-muted-foreground">Custo do filamento</dt><dd class="font-medium tabular-nums">{{ money(calculation.materialCost) }}</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-muted-foreground">Custo da energia</dt><dd class="font-medium tabular-nums">{{ money(calculation.energyCost) }}</dd></div>
+          <div class="flex justify-between gap-4 border-t border-border pt-3"><dt class="text-muted-foreground">Custo direto total</dt><dd class="font-semibold tabular-nums">{{ money(calculation.directCost) }}</dd></div>
+        </dl>
+        <div class="mt-6 rounded-xl bg-primary p-4 text-primary-foreground">
+          <p class="text-sm">Preço de venda sugerido</p>
+          <p class="mt-1 text-3xl font-semibold tabular-nums">{{ money(calculation.suggestedPrice) }}</p>
+        </div>
+        <p class="mt-4 text-xs leading-5 text-muted-foreground">Estimativa para uma peça. Inclui apenas filamento e energia; outros custos não entram no valor.</p>
+      } @else {
+        <p class="mt-5 text-sm leading-6 text-muted-foreground">Preencha os seis valores com números maiores ou iguais a zero para ver o cálculo.</p>
+      }
+    </div>
+  </div>
+</section>

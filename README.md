@@ -10,11 +10,11 @@ O projeto contém a base Angular e as telas de acesso da prévia. Ainda não há
 - CSS com Tailwind CSS v4 e tema `neutral` do Spartan. O menu lateral usa o Sidebar Helm gerado em `libs/ui/sidebar`, com os componentes de apoio do Spartan em `libs/ui/`.
 - Vitest configurado com testes de navegação e validação dos formulários, organizados por tela. O workflow em `.github/workflows/unit-tests.yml` executa todos os testes em pushes e pull requests.
 - Entrada, recuperação de senha e nova senha com um layout compartilhado, usando a logo em `public/brand/logo.jpg`.
-- A entrada da prévia é livre: um botão abre `/inicio` sem pedir e-mail ou senha. A área interna tem barra superior, menu lateral responsivo e páginas provisórias, incluindo a rota da Calculadora.
-- O menu contém Dashboard, Produtos, Insumos, Calculadora, Encomendas, Consignado, Clientes e lojas, Financeiro e Log. Operação e Gestão são grupos expansíveis com transição; “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada. Sidebar e Collapsible Helm do Spartan controlam a navegação e os grupos expansíveis.
+- A entrada da prévia é livre: um botão abre `/inicio` sem pedir e-mail ou senha. A área interna tem barra superior, menu lateral responsivo e páginas provisórias, incluindo a rota de Precificação.
+- O menu contém Dashboard, Produtos, Insumos, Precificação, Encomendas, Consignado, Clientes e lojas, Financeiro e Log. Operação e Gestão são grupos expansíveis com transição; “Encomendas do site” aparece desativado, marcado como futuro. O rodapé mostra “Modo prévia”, permite escolher tema claro ou escuro (preferência local) e oferece Sair, que apenas retorna à entrada. Sidebar e Collapsible Helm do Spartan controlam a navegação e os grupos expansíveis.
 - As páginas internas entram com uma transição curta. A interface respeita a preferência do sistema por movimento reduzido; transições discretas serão consideradas também nas próximas telas.
 - A recuperação mostra uma confirmação de prévia sem enviar e-mail; a nova senha não valida o token nem altera a senha.
-- A rota Calculadora permanece no menu, mas sua tela contém apenas o título; será reconstruída passo a passo com o usuário.
+- A rota Precificação contém o cadastro de margens de lucro, o cadastro conjunto de tarifa de energia e potência média da impressora e uma calculadora avulsa de preço de uma peça. Ela mostra o último cadastro de energia e permite consultar o histórico em uma modal com transição discreta de entrada. Os cadastros são salvos somente neste navegador para validar a interface; a simulação usa apenas os números digitados nela.
 - Sem backend, contas cadastradas ou autenticação real nesta etapa.
 
 ## Direção do produto
@@ -22,6 +22,8 @@ O projeto contém a base Angular e as telas de acesso da prévia. Ainda não há
 A interface usa uma barra superior com marca e indicador de prévia; no celular, ela também abre o menu lateral. Os títulos ficam no conteúdo de cada página. O menu e seu rodapé foram definidos para a prévia, enquanto a identidade visual final ainda pode evoluir.
 
 A primeira versão prevê dois acessos individuais, para o usuário e sua esposa. Enquanto as telas são desenhadas, o acesso à prévia está livre e não identifica um usuário. O perfil inicialmente previsto é administrador, com uma estrutura preparada para outros perfis e permissões. O backend será responsável por determinar e validar o acesso por meio de token. O frontend usará as permissões recebidas para restringir rotas e ações. O formato do token e o contrato de autenticação ainda não foram definidos.
+
+Depois da conclusão do backend, está planejada a entrada com conta Google e a criação de perfis de acesso. O fluxo de associação de contas, os perfis e as permissões ainda serão definidos. Nenhuma dessas funcionalidades está disponível na prévia atual.
 
 O fluxo planejado de recuperação solicita o e-mail e mostra uma resposta genérica. O link recebido por e-mail deverá levar à tela de nova senha com um token, que será validado pelo backend antes de qualquer alteração. Nesta fase, as telas servem para validar a interface; não há envio de e-mail nem redefinição real de senha.
 
@@ -45,7 +47,7 @@ O orçamento de cada peça deverá aceitar vários filamentos, com gramas e pre�
 
 Os percentuais iniciais informados são 100% para lojas, 300% para amigos e pessoas próximas e 500% para encomendas em geral. Esse percentual é um **acréscimo sobre o custo direto (markup)**, não uma margem de lucro sobre o preço de venda: equivale a multiplicar material + energia por 2, 4 ou 6. O cálculo ainda não inclui mão de obra, manutenção, perdas, embalagem, taxas, tributos, frete e despesas fixas; o valor acima do custo direto não representa lucro líquido.
 
-A tela `/calculadora` foi limpa a pedido do usuário e atualmente mostra apenas o título. O cadastro de margens, a configuração de energia e impressora e um possível simulador ainda serão definidos e construídos passo a passo. No orçamento real, os filamentos e seus preços deverão vir de Insumos; gramas e tempo serão informados depois de fatiar a peça.
+A tela `/precificacao` permite cadastrar e editar margens de lucro com nome e porcentagem. Também permite registrar, em cada lançamento, a tarifa de energia em R$/kWh e a potência média da impressora em W, com data e hora; mostra apenas o lançamento mais recente e oferece uma modal para consultar o histórico. A calculadora avulsa usa seis números digitados na hora, sem ler esses cadastros: preço do filamento por kg, gramas, horas, potência média, tarifa e margem de lucro informada. A fórmula aplica essa margem como acréscimo sobre custos diretos (markup). Exibe os custos de material e energia, o custo direto total e o preço sugerido para uma peça. Ainda não há vínculo com orçamentos. A rota antiga `/calculadora` redireciona para `/precificacao`. No orçamento real, os filamentos e seus preços deverão vir de Insumos; gramas e tempo serão informados depois de fatiar a peça.
 
 Ainda serão definidos o controle de rolos/lotes com preços distintos, a quantidade de impressoras, outros custos, arredondamento e como preservar orçamentos já apresentados. O preço do filamento deverá vir futuramente do cadastro de Insumos.
 
@@ -55,7 +57,7 @@ O dashboard pretendido reunirá gráficos de encomendas, vendas e arrecadação,
 
 - `/login`: botão de acesso livre à prévia do CRM.
 - `/inicio`: prévia do Dashboard.
-- `/calculadora`: página vazia com título, aguardando definição passo a passo.
+- `/precificacao`: cadastros de prévia das margens de lucro e dos valores de energia e impressora, histórico local em modal e calculadora avulsa de preço (`/calculadora` redireciona para esta rota).
 - `/log`: prévia do histórico de alterações com dados de exemplo, busca textual e filtro obrigatório por período.
 - `/produtos`, `/insumos`, `/encomendas`, `/consignado`, `/clientes-lojas` e `/financeiro`: páginas provisórias de navegação, ainda sem funcionalidades de negócio.
 - `/recuperar-senha`: formulário de e-mail e confirmação de prévia.

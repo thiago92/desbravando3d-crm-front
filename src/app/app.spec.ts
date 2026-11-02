@@ -28,4 +28,17 @@ describe('App', () => {
     expect(router.url).toBe('/login');
     expect(compiled.querySelector('h2')?.textContent).toContain('Vamos começar');
   });
+
+  it('redirects the old calculator URL to Precificação', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+
+    await router.navigateByUrl('/calculadora');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(router.url).toBe('/precificacao');
+    expect((fixture.nativeElement as HTMLElement).querySelector('main h1')?.textContent).toBe('Precificação');
+  });
 });

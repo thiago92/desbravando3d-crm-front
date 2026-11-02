@@ -1,0 +1,65 @@
+<section class="mt-10 border-t border-border pt-10" aria-labelledby="energy-settings-heading">
+  <h2 id="energy-settings-heading" class="text-2xl font-semibold tracking-tight">Energia e impressora</h2>
+  <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Registre a tarifa cobrada pela distribuidora e a potência média estimada da impressora durante uma impressão. Cada cadastro preserva os valores anteriores no histórico.</p>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] lg:items-start">
+    <form (ngSubmit)="save()" class="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <h3 class="text-lg font-semibold">Novo cadastro</h3>
+
+      <label for="energy-tariff" class="mt-6 block text-sm font-medium">Tarifa de energia (R$/kWh)</label>
+      <input id="energy-tariff" name="tariff" type="number" required min="0.0001" step="0.0001" [(ngModel)]="tariffPerKwh" placeholder="Ex.: 0.90" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <p class="mt-1 text-xs text-muted-foreground">Valor cobrado por quilowatt-hora, conforme sua conta de energia.</p>
+
+      <label for="printer-power" class="mt-5 block text-sm font-medium">Consumo médio da impressora (W)</label>
+      <input id="printer-power" name="power" type="number" required min="0.01" step="0.01" [(ngModel)]="averagePowerW" placeholder="Ex.: 150" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <p class="mt-1 text-xs text-muted-foreground">Potência média estimada durante a impressão.</p>
+
+      @if (error()) { <p class="mt-4 text-sm text-destructive" role="alert">{{ error() }}</p> }
+      <button type="submit" class="mt-6 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 motion-reduce:transition-none">Cadastrar valores</button>
+    </form>
+
+    <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5 sm:p-6">
+        <div>
+          <h3 class="text-lg font-semibold">Cadastro mais recente</h3>
+          <p class="mt-1 text-sm text-muted-foreground">Os valores de prévia ficam somente neste navegador.</p>
+        </div>
+        <button type="button" (click)="openHistory()" class="inline-flex h-9 items-center justify-center rounded-md border border-input px-3 text-sm font-medium transition-colors hover:bg-accent motion-reduce:transition-none">Consultar histórico</button>
+      </div>
+      @if (latest(); as item) {
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[520px] text-left text-sm">
+            <thead class="bg-muted/50 text-muted-foreground"><tr><th scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
+            <tbody><tr class="border-t border-border"><td class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr></tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="p-6 text-sm text-muted-foreground">Nenhum valor cadastrado ainda.</p>
+      }
+    </div>
+  </div>
+
+  <dialog #historyDialog aria-labelledby="energy-history-heading" class="history-dialog m-auto max-h-[85dvh] w-[min(94vw,840px)] overflow-hidden rounded-2xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/50">
+    <div class="flex items-start justify-between gap-4 border-b border-border p-5 sm:p-6">
+      <div>
+        <h3 id="energy-history-heading" class="text-lg font-semibold">Histórico de energia e impressora</h3>
+        <p class="mt-1 text-sm text-muted-foreground">Todos os cadastros desta prévia, do mais recente ao mais antigo.</p>
+      </div>
+      <button type="button" (click)="closeHistory()" aria-label="Fechar histórico" class="rounded-md px-2 py-1 text-xl leading-none hover:bg-accent">×</button>
+    </div>
+    <div class="max-h-[65dvh] overflow-auto">
+      @if (history().length) {
+        <table class="w-full min-w-[560px] text-left text-sm">
+          <thead class="sticky top-0 bg-muted text-muted-foreground"><tr><th scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
+          <tbody>
+            @for (item of history(); track item.id) {
+              <tr class="border-t border-border"><td class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="p-6 text-sm text-muted-foreground">Nenhum valor cadastrado ainda.</p>
+      }
+    </div>
+  </dialog>
+</section>

@@ -40,9 +40,10 @@ export const routes: Routes = [
         data: { title: 'Insumos', description: 'Aqui serão cadastrados os filamentos e acompanhados os saldos disponíveis, reservados e consumidos.' },
       },
       {
-        path: 'calculadora',
+        path: 'precificacao',
         loadComponent: () => import('./features/calculadora/calculadora').then((module) => module.Calculadora),
       },
+      { path: 'calculadora', pathMatch: 'full', redirectTo: 'precificacao' },
       {
         path: 'encomendas',
         loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
