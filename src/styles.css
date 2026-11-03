@@ -23,6 +23,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  [data-slot],
+  .cdk-overlay-backdrop,
+  .cdk-overlay-pane * {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
   .crm-route-content > router-outlet + * {
     animation: none;
   }

@@ -1,5 +1,7 @@
 import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { formatDateTime, normalizeSearch } from '../../shared/utils/presentation';
 
 interface LogEvent {
   id: string;
@@ -39,26 +41,22 @@ const previewEvents: LogEvent[] = [
   },
 ];
 
-function normalize(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
-}
-
 export function filterLogEvents(events: LogEvent[], start: string, end: string, query: string): LogEvent[] {
   if (!start || !end || start > end) return [];
-  const term = normalize(query.trim());
+  const term = normalizeSearch(query.trim());
   return events.filter((event) => {
     const day = event.occurredAt.slice(0, 10);
     if (day < start || day > end) return false;
     if (!term) return true;
     const searchable = [event.id, event.occurredAt, event.actor, event.area, event.record, event.action, event.summary,
       ...event.changes.flatMap((change) => [change.field, change.before ?? '', change.after])];
-    return searchable.some((value) => normalize(value).includes(term));
+    return searchable.some((value) => normalizeSearch(value).includes(term));
   });
 }
 
 @Component({
   selector: 'app-log',
-  imports: [FormsModule],
+  imports: [FormsModule, HlmInput],
   templateUrl: './log.html',
 })
 export class Log {
@@ -68,7 +66,5 @@ export class Log {
   protected readonly invalidPeriod = computed(() => !this.start() || !this.end() || this.start() > this.end());
   protected readonly events = computed(() => filterLogEvents(previewEvents, this.start(), this.end(), this.query()));
 
-  protected formatDate(value: string): string {
-    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
-  }
+  protected readonly formatDate = formatDateTime;
 }

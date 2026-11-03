@@ -1,10 +1,12 @@
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-forgot-password',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [HlmButton, HlmInput, ReactiveFormsModule, RouterLink],
   templateUrl: './forgot-password.html',
   styleUrl: '../auth-form.css',
 })

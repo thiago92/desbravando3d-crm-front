@@ -1,5 +1,8 @@
 import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { formatMoney } from '../../../shared/utils/presentation';
 import { calculatePrintPrice, type PrintCalculationInputs } from './print-calculation';
 
 const emptyInputs: PrintCalculationInputs = {
@@ -11,11 +14,9 @@ const emptyInputs: PrintCalculationInputs = {
   markupPercent: null,
 };
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
 @Component({
   selector: 'app-print-calculator',
-  imports: [FormsModule],
+  imports: [FormsModule, HlmButton, HlmInput],
   templateUrl: './print-calculator.html',
 })
 export class PrintCalculator {
@@ -31,7 +32,5 @@ export class PrintCalculator {
     this.inputs.set({ ...emptyInputs });
   }
 
-  protected money(value: number): string {
-    return currencyFormatter.format(value);
-  }
+  protected readonly money = formatMoney;
 }

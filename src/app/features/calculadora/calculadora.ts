@@ -1,5 +1,8 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 import { EnergySettings } from './energy-settings/energy-settings';
 import { PrintCalculator } from './print-calculator/print-calculator';
 
@@ -27,7 +30,7 @@ function readPercentages(): PricingPercentage[] {
 
 @Component({
   selector: 'app-calculadora',
-  imports: [FormsModule, EnergySettings, PrintCalculator],
+  imports: [FormsModule, EnergySettings, PrintCalculator, HlmButton, HlmInput, ...HlmTableImports],
   templateUrl: './calculadora.html',
 })
 export class Calculadora {

@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { EnergySettings } from './energy-settings';
+import { provideSpartanHlm } from '@spartan-ng/helm/utils';
 
 describe('Energia e impressora', () => {
   beforeEach(async () => {
     localStorage.removeItem('crm-energy-settings-preview');
-    await TestBed.configureTestingModule({ imports: [EnergySettings] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [EnergySettings], providers: [provideSpartanHlm()] }).compileComponents();
   });
 
   afterEach(() => localStorage.removeItem('crm-energy-settings-preview'));
@@ -33,13 +34,18 @@ describe('Energia e impressora', () => {
 
     expect(root.querySelectorAll('section > div table tbody tr')).toHaveLength(1);
     expect(root.querySelector('section > div table tbody')?.textContent).toContain('180 W');
-    expect(root.querySelectorAll('dialog tbody tr')).toHaveLength(2);
-    expect(root.querySelector('dialog tbody')?.textContent).toContain('150 W');
     expect(JSON.parse(localStorage.getItem('crm-energy-settings-preview') ?? '[]')).toHaveLength(2);
-
-    const dialog = root.querySelector('dialog')!;
-    dialog.showModal = vi.fn();
     root.querySelector<HTMLButtonElement>('button:not([type="submit"])')!.click();
-    expect(dialog.showModal).toHaveBeenCalledOnce();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog).not.toBeNull();
+    expect(dialog.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(dialog.querySelector('tbody')?.textContent).toContain('150 W');
+    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
+    dialog.querySelector<HTMLButtonElement>('[aria-label="Fechar histórico"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 });

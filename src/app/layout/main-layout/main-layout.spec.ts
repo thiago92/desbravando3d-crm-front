@@ -41,6 +41,12 @@ describe('MainLayout', () => {
     expect(router.url).toBe('/insumos');
     expect(compiled.querySelector('main h1')?.textContent).toBe('Insumos');
 
+    (compiled.querySelector('a[href="/encomendas"]') as HTMLAnchorElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(router.url).toBe('/encomendas');
+    expect(compiled.querySelectorAll('main .kanban-column')).toHaveLength(6);
+
     const darkButton = Array.from(compiled.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Escuro') as HTMLButtonElement;
     darkButton.click();
     fixture.detectChanges();

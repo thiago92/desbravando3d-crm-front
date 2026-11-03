@@ -31,13 +31,11 @@ export const routes: Routes = [
       },
       {
         path: 'produtos',
-        loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
-        data: { title: 'Produtos', description: 'O cadastro será desenhado para atender ao CRM e ao futuro e-commerce.' },
+        loadComponent: () => import('./features/produtos/produtos').then((module) => module.Produtos),
       },
       {
         path: 'insumos',
-        loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
-        data: { title: 'Insumos', description: 'Aqui serão cadastrados os filamentos e acompanhados os saldos disponíveis, reservados e consumidos.' },
+        loadComponent: () => import('./features/insumos/insumos').then((module) => module.Insumos),
       },
       {
         path: 'precificacao',
@@ -46,8 +44,7 @@ export const routes: Routes = [
       { path: 'calculadora', pathMatch: 'full', redirectTo: 'precificacao' },
       {
         path: 'encomendas',
-        loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
-        data: { title: 'Encomendas', description: 'O fluxo de solicitação, orçamento, produção, entrega e pagamento será detalhado antes desta tela.' },
+        loadComponent: () => import('./features/encomendas/encomendas').then((module) => module.Encomendas),
       },
       {
         path: 'consignado',

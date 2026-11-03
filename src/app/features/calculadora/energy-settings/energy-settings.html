@@ -7,15 +7,15 @@
       <h3 class="text-lg font-semibold">Novo cadastro</h3>
 
       <label for="energy-tariff" class="mt-6 block text-sm font-medium">Tarifa de energia (R$/kWh)</label>
-      <input id="energy-tariff" name="tariff" type="number" required min="0.0001" step="0.0001" [(ngModel)]="tariffPerKwh" placeholder="Ex.: 0.90" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <input hlmInput id="energy-tariff" name="tariff" type="number" required min="0.0001" step="0.0001" [(ngModel)]="tariffPerKwh" placeholder="Ex.: 0.90" class="mt-2 h-10" />
       <p class="mt-1 text-xs text-muted-foreground">Valor cobrado por quilowatt-hora, conforme sua conta de energia.</p>
 
       <label for="printer-power" class="mt-5 block text-sm font-medium">Consumo médio da impressora (W)</label>
-      <input id="printer-power" name="power" type="number" required min="0.01" step="0.01" [(ngModel)]="averagePowerW" placeholder="Ex.: 150" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <input hlmInput id="printer-power" name="power" type="number" required min="0.01" step="0.01" [(ngModel)]="averagePowerW" placeholder="Ex.: 150" class="mt-2 h-10" />
       <p class="mt-1 text-xs text-muted-foreground">Potência média estimada durante a impressão.</p>
 
       @if (error()) { <p class="mt-4 text-sm text-destructive" role="alert">{{ error() }}</p> }
-      <button type="submit" class="mt-6 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 motion-reduce:transition-none">Cadastrar valores</button>
+      <button hlmBtn variant="default" type="submit" class="h-10">Cadastrar valores</button>
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -24,13 +24,13 @@
           <h3 class="text-lg font-semibold">Cadastro mais recente</h3>
           <p class="mt-1 text-sm text-muted-foreground">Os valores de prévia ficam somente neste navegador.</p>
         </div>
-        <button type="button" (click)="openHistory()" class="inline-flex h-9 items-center justify-center rounded-md border border-input px-3 text-sm font-medium transition-colors hover:bg-accent motion-reduce:transition-none">Consultar histórico</button>
+        <button hlmBtn variant="outline" type="button" (click)="openHistory()" class="h-10">Consultar histórico</button>
       </div>
       @if (latest(); as item) {
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[520px] text-left text-sm">
-            <thead class="bg-muted/50 text-muted-foreground"><tr><th scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
-            <tbody><tr class="border-t border-border"><td class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr></tbody>
+          <table hlmTable class="w-full min-w-[520px] text-left text-sm">
+            <thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th hlmTh scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
+            <tbody hlmTBody><tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td hlmTd class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td hlmTd class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr></tbody>
           </table>
         </div>
       } @else {
@@ -39,21 +39,22 @@
     </div>
   </div>
 
-  <dialog #historyDialog aria-labelledby="energy-history-heading" class="history-dialog m-auto max-h-[85dvh] w-[min(94vw,840px)] overflow-hidden rounded-2xl border border-border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/50">
+  <hlm-dialog #historyDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal [showCloseButton]="false" class="max-h-[85dvh] w-[min(94vw,840px)] max-w-none gap-0 overflow-hidden p-0 sm:max-w-none">
     <div class="flex items-start justify-between gap-4 border-b border-border p-5 sm:p-6">
       <div>
-        <h3 id="energy-history-heading" class="text-lg font-semibold">Histórico de energia e impressora</h3>
-        <p class="mt-1 text-sm text-muted-foreground">Todos os cadastros desta prévia, do mais recente ao mais antigo.</p>
+        <h3 hlmDialogTitle id="energy-history-heading" class="text-lg font-semibold">Histórico de energia e impressora</h3>
+        <p hlmDialogDescription class="mt-1 text-sm text-muted-foreground">Todos os cadastros desta prévia, do mais recente ao mais antigo.</p>
       </div>
-      <button type="button" (click)="closeHistory()" aria-label="Fechar histórico" class="rounded-md px-2 py-1 text-xl leading-none hover:bg-accent">×</button>
+      <button hlmBtn variant="outline" type="button" (click)="closeHistory()" aria-label="Fechar histórico" class="h-10">×</button>
     </div>
     <div class="max-h-[65dvh] overflow-auto">
       @if (history().length) {
-        <table class="w-full min-w-[560px] text-left text-sm">
-          <thead class="sticky top-0 bg-muted text-muted-foreground"><tr><th scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
-          <tbody>
+        <table hlmTable class="w-full min-w-[560px] text-left text-sm">
+          <thead hlmTHead class="sticky top-0 bg-muted text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th hlmTh scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
+          <tbody hlmTBody>
             @for (item of history(); track item.id) {
-              <tr class="border-t border-border"><td class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr>
+              <tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td hlmTd class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td hlmTd class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr>
             }
           </tbody>
         </table>
@@ -61,5 +62,6 @@
         <p class="p-6 text-sm text-muted-foreground">Nenhum valor cadastrado ainda.</p>
       }
     </div>
-  </dialog>
+  </hlm-dialog-content>
+  </hlm-dialog>
 </section>

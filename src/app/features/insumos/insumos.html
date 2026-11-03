@@ -1,0 +1,108 @@
+<section class="mx-auto max-w-6xl">
+  <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Prévia do CRM</p>
+  <div class="mt-3 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Insumos</h1>
+      <p class="mt-3 text-sm leading-6 text-muted-foreground">Cadastre seus filamentos e acompanhe o saldo disponível em gramas.</p>
+    </div>
+    <button hlmBtn type="button" (click)="open()">+ Cadastrar filamento</button>
+  </div>
+  <p class="mt-4 text-xs leading-5 text-muted-foreground">Estoque de exemplo. As alterações ficam apenas nesta visita e são reiniciadas ao recarregar a página.</p>
+
+  <div class="mt-8 rounded-2xl border border-border bg-card p-5">
+    <label for="filament-search" class="text-sm font-medium">Buscar filamento</label>
+    <input hlmInput id="filament-search" type="search" class="mt-2 sm:max-w-md" placeholder="Nome, material ou cor" [ngModel]="query()" (ngModelChange)="query.set($event)" />
+    <p class="mt-3 text-xs text-muted-foreground">Um único saldo por material e cor. Novas entradas são somadas ao mesmo cadastro.</p>
+  </div>
+  @if (notice()) { <p role="status" class="mt-4 rounded-lg border border-border bg-secondary p-3 text-sm">{{ notice() }}</p> }
+  <p class="my-4 text-sm text-muted-foreground" aria-live="polite">{{ filaments().length }} {{ filaments().length === 1 ? 'filamento encontrado' : 'filamentos encontrados' }}</p>
+
+  @if (filaments().length) {
+    <div hlmTableContainer class="rounded-2xl border border-border bg-card">
+      <table hlmTable>
+        <thead hlmTHead class="bg-muted/50">
+          <tr hlmTr>
+            <th hlmTh class="px-5 py-3" scope="col">Filamento</th>
+            <th hlmTh class="px-5 py-3" scope="col">Material</th>
+            <th hlmTh class="px-5 py-3" scope="col">Cor</th>
+            <th hlmTh class="px-5 py-3 text-right" scope="col">Saldo disponível</th>
+            <th hlmTh class="px-5 py-3 text-right" scope="col">Preço por kg</th>
+            <th hlmTh class="px-5 py-3 text-right" scope="col">Ações</th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (item of filaments(); track item.id) {
+            <tr hlmTr>
+              <td hlmTd class="px-5 py-4 font-medium">{{ item.name }}</td>
+              <td hlmTd class="px-5 py-4">{{ item.material }}</td>
+              <td hlmTd class="px-5 py-4">{{ item.color }}</td>
+              <td hlmTd class="px-5 py-4 text-right tabular-nums">{{ measure(item.balanceGrams) }} g</td>
+              <td hlmTd class="px-5 py-4 text-right tabular-nums">{{ money(item.pricePerKg) }}</td>
+              <td hlmTd class="px-5 py-4 text-right"><button hlmBtn variant="outline" type="button" [attr.aria-label]="'Editar ' + item.name" (click)="open(item)">Editar estoque</button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="rounded-2xl border border-dashed border-border p-10 text-center">
+      <h2 class="font-semibold">Nenhum filamento encontrado</h2>
+      <p class="mt-2 text-sm text-muted-foreground">Tente outro nome, material ou cor, ou cadastre um filamento.</p>
+      @if (query()) { <button hlmBtn variant="ghost" class="mt-4" type="button" (click)="query.set('')">Limpar pesquisa</button> }
+    </div>
+  }
+
+  <hlm-dialog #filamentDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar filamento" class="max-h-[90dvh] w-[min(94vw,640px)] max-w-none overflow-auto sm:max-w-none">
+      <hlm-dialog-header>
+        <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">{{ selected() ? 'Editar filamento e estoque' : 'Cadastrar filamento' }}</h2>
+        <p hlmDialogDescription class="text-sm leading-6 text-muted-foreground">{{ selected() ? 'Adicione uma entrada ao estoque ou corrija o saldo total. O preço por kg pode ser atualizado neste cadastro.' : 'Informe o filamento, o preço por kg e a quantidade disponível hoje.' }}</p>
+      </hlm-dialog-header>
+      <form (ngSubmit)="save()" class="space-y-5">
+        <div>
+          <label for="filament-name" class="text-sm font-medium">Nome do filamento</label>
+          <input hlmInput id="filament-name" name="name" [(ngModel)]="name" required maxlength="120" class="mt-2" placeholder="Ex.: Filamento vermelho" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="filament-material" class="text-sm font-medium">Material</label>
+            <input hlmInput id="filament-material" name="material" [(ngModel)]="material" required maxlength="60" class="mt-2" placeholder="Ex.: PLA, PETG" />
+          </div>
+          <div>
+            <label for="filament-color" class="text-sm font-medium">Cor</label>
+            <input hlmInput id="filament-color" name="color" [(ngModel)]="color" required maxlength="60" class="mt-2" placeholder="Ex.: Vermelho" />
+          </div>
+        </div>
+        <div>
+          <label for="filament-price" class="text-sm font-medium">Preço do filamento por kg (R$)</label>
+          <input hlmInput id="filament-price" name="price" type="number" [(ngModel)]="pricePerKg" required min="0.01" step="0.01" class="mt-2" aria-describedby="filament-price-help" />
+          <p id="filament-price-help" class="mt-2 text-xs leading-5 text-muted-foreground">Se o preço mudou, informe o novo valor por kg. Ele substitui o preço anterior deste filamento.</p>
+        </div>
+
+        <fieldset class="rounded-xl border border-border p-4">
+          <legend class="px-1 text-sm font-semibold">{{ selected() ? 'Atualizar estoque' : 'Estoque inicial' }}</legend>
+          @if (selected(); as item) {
+            <p class="text-sm text-muted-foreground">Saldo atual: <strong class="font-semibold text-foreground">{{ measure(item.balanceGrams) }} g</strong></p>
+            <hlm-toggle-group type="single" variant="outline" [nullable]="false" [value]="mode()" (valueChange)="setMode($event)" aria-label="Como atualizar o estoque" class="mt-4 flex-wrap">
+              <button hlmToggleGroupItem value="add">Adicionar entrada</button>
+              <button hlmToggleGroupItem value="replace">Corrigir saldo total</button>
+            </hlm-toggle-group>
+          }
+          <label for="filament-quantity" class="mt-4 block text-sm font-medium">{{ !selected() ? 'Saldo inicial (g)' : mode() === 'add' ? 'Quantidade comprada a adicionar (g)' : 'Novo saldo total (g)' }}</label>
+          <input hlmInput id="filament-quantity" name="quantity" type="number" [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" [required]="!selected() || mode() === 'replace'" min="0" step="0.01" class="mt-2" aria-describedby="filament-quantity-help" />
+          <p id="filament-quantity-help" class="mt-2 text-xs leading-5 text-muted-foreground">
+            {{ !selected() ? 'Informe a quantidade disponível em gramas. Pode ser zero.' : mode() === 'add' ? 'Informe somente o que comprou. Ex.: 500 g em estoque + 1.000 g de entrada = 1.500 g. Deixe em branco para manter o saldo.' : 'Este valor substitui todo o saldo atual. Use para corrigir a quantidade disponível, inclusive para zero.' }}
+          </p>
+          @if (nextBalance() !== null) {
+            <p class="mt-4 rounded-lg bg-secondary p-3 text-sm" aria-live="polite" data-balance-preview>Saldo após salvar: <strong>{{ measure(nextBalance()!) }} g</strong></p>
+          }
+        </fieldset>
+        @if (error()) { <p role="alert" class="text-sm text-destructive">{{ error() }}</p> }
+        <hlm-dialog-footer>
+          <button hlmBtn variant="outline" type="button" (click)="close()">Cancelar</button>
+          <button hlmBtn type="submit" [disabled]="saved()">{{ selected() ? 'Salvar alterações' : 'Cadastrar filamento' }}</button>
+        </hlm-dialog-footer>
+      </form>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</section>

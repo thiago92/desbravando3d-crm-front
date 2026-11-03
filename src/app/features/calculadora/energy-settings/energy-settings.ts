@@ -1,5 +1,10 @@
-import { Component, ElementRef, ViewChild, computed, signal } from '@angular/core';
+import { Component, ViewChild, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmDialog, HlmDialogImports } from '@spartan-ng/helm/dialog';
+import { HlmTableImports } from '@spartan-ng/helm/table';
+import { formatDateTime, formatMeasure, formatTariff } from '../../../shared/utils/presentation';
 
 interface EnergySetting {
   id: number;
@@ -27,12 +32,11 @@ function readSettings(): EnergySetting[] {
 
 @Component({
   selector: 'app-energy-settings',
-  imports: [FormsModule],
+  imports: [FormsModule, HlmButton, HlmInput, ...HlmDialogImports, ...HlmTableImports],
   templateUrl: './energy-settings.html',
-  styleUrl: './energy-settings.css',
 })
 export class EnergySettings {
-  @ViewChild('historyDialog') private historyDialog?: ElementRef<HTMLDialogElement>;
+  @ViewChild('historyDialog') private historyDialog?: HlmDialog;
 
   protected readonly settings = signal(readSettings());
   protected readonly history = computed(() => [...this.settings()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id));
@@ -68,22 +72,14 @@ export class EnergySettings {
   }
 
   protected openHistory(): void {
-    this.historyDialog?.nativeElement.showModal();
+    this.historyDialog?.open();
   }
 
   protected closeHistory(): void {
-    this.historyDialog?.nativeElement.close();
+    this.historyDialog?.close();
   }
 
-  protected formatDate(value: string): string {
-    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
-  }
-
-  protected formatTariff(value: number): string {
-    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value);
-  }
-
-  protected formatPower(value: number): string {
-    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
-  }
+  protected readonly formatDate = formatDateTime;
+  protected readonly formatTariff = formatTariff;
+  protected readonly formatPower = formatMeasure;
 }

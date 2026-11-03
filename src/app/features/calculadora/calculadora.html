@@ -8,17 +8,17 @@
       <p class="mt-1 text-sm text-muted-foreground">Ex.: consignado, lojas parceiras, desconto especial ou padrão.</p>
 
       <label for="percentage-name" class="mt-6 block text-sm font-medium">Nome</label>
-      <input id="percentage-name" name="name" type="text" required maxlength="80" [(ngModel)]="name" placeholder="Ex.: Consignado" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <input hlmInput id="percentage-name" name="name" type="text" required maxlength="80" [(ngModel)]="name" placeholder="Ex.: Consignado" class="mt-2 h-10" />
 
       <label for="percentage-value" class="mt-5 block text-sm font-medium">Margem de lucro (%)</label>
-      <input id="percentage-value" name="percentage" type="number" required min="0" step="0.01" [(ngModel)]="percentage" placeholder="Ex.: 100" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <input hlmInput id="percentage-value" name="percentage" type="number" required min="0" step="0.01" [(ngModel)]="percentage" placeholder="Ex.: 100" class="mt-2 h-10" />
 
       @if (error()) { <p class="mt-4 text-sm text-destructive" role="alert">{{ error() }}</p> }
 
       <div class="mt-6 flex flex-wrap gap-2">
-        <button type="submit" class="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 motion-reduce:transition-none">{{ editingId() === null ? 'Adicionar' : 'Salvar alterações' }}</button>
+        <button hlmBtn variant="default" type="submit" class="h-10">{{ editingId() === null ? 'Adicionar' : 'Salvar alterações' }}</button>
         @if (editingId() !== null) {
-          <button type="button" (click)="cancel()" class="inline-flex h-10 items-center justify-center rounded-md border border-input px-4 text-sm font-medium transition-colors hover:bg-accent motion-reduce:transition-none">Cancelar</button>
+          <button hlmBtn variant="outline" type="button" (click)="cancel()" class="h-10">Cancelar</button>
         }
       </div>
     </form>
@@ -30,11 +30,11 @@
       </div>
       @if (percentages().length) {
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[420px] text-left text-sm">
-            <thead class="bg-muted/50 text-muted-foreground"><tr><th scope="col" class="px-5 py-3 font-medium sm:px-6">Nome</th><th scope="col" class="px-5 py-3 font-medium">Porcentagem</th><th scope="col" class="px-5 py-3 text-right font-medium sm:px-6">Ações</th></tr></thead>
-            <tbody>
+          <table hlmTable class="w-full min-w-[420px] text-left text-sm">
+            <thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Nome</th><th hlmTh scope="col" class="px-5 py-3 font-medium">Porcentagem</th><th hlmTh scope="col" class="px-5 py-3 text-right font-medium sm:px-6">Ações</th></tr></thead>
+            <tbody hlmTBody>
               @for (item of percentages(); track item.id) {
-                <tr class="border-t border-border"><td class="px-5 py-4 font-medium sm:px-6">{{ item.name }}</td><td class="px-5 py-4">{{ item.percentage }}%</td><td class="px-5 py-4 text-right sm:px-6"><button type="button" (click)="edit(item)" class="rounded-md px-2 py-1 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">Editar {{ item.name }}</button></td></tr>
+                <tr hlmTr><td hlmTd class="px-5 py-4 font-medium sm:px-6">{{ item.name }}</td><td hlmTd class="px-5 py-4">{{ item.percentage }}%</td><td hlmTd class="px-5 py-4 text-right sm:px-6"><button hlmBtn variant="ghost" type="button" (click)="edit(item)" class="h-10">Editar {{ item.name }}</button></td></tr>
               }
             </tbody>
           </table>

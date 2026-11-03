@@ -7,15 +7,15 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] lg:items-end">
       <label class="block text-sm font-medium">
         Buscar em todos os campos
-        <input type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="Ex.: Maria, filamento, 700 g" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        <input hlmInput type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="Ex.: Maria, filamento, 700 g" class="mt-2 h-10" />
       </label>
       <label class="block text-sm font-medium">
         Data inicial <span aria-hidden="true">*</span>
-        <input type="date" required [ngModel]="start()" (ngModelChange)="start.set($event)" [max]="end() || null" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        <input hlmInput type="date" required [ngModel]="start()" (ngModelChange)="start.set($event)" [max]="end() || null" class="mt-2 h-10" />
       </label>
       <label class="block text-sm font-medium">
         Data final <span aria-hidden="true">*</span>
-        <input type="date" required [ngModel]="end()" (ngModelChange)="end.set($event)" [min]="start() || null" class="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        <input hlmInput type="date" required [ngModel]="end()" (ngModelChange)="end.set($event)" [min]="start() || null" class="mt-2 h-10" />
       </label>
     </div>
     @if (invalidPeriod()) {

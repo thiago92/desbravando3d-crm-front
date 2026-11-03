@@ -1,0 +1,129 @@
+<section class="mx-auto max-w-6xl">
+  <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Prévia do CRM</p>
+  <div class="mt-3 flex flex-wrap items-center justify-between gap-4">
+    <div><h1 class="text-3xl font-semibold tracking-tight">Produtos</h1><p class="mt-3 text-sm leading-6 text-muted-foreground">Explore seu catálogo e consulte os detalhes de cada peça.</p></div>
+    <button hlmBtn variant="default" type="button" (click)="open()">+ Cadastrar produto</button>
+  </div>
+  <p class="mt-4 text-xs leading-5 text-muted-foreground">Catálogo de exemplo. Cadastros e edições ficam apenas nesta visita e são reiniciados ao recarregar a página.</p>
+
+  <div class="mt-8 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+    <label class="block w-full text-sm font-medium sm:max-w-sm">Buscar produto
+      <input hlmInput type="search" placeholder="Pesquisar por nome" [ngModel]="query()" (ngModelChange)="query.set($event)" class="mt-2" />
+    </label>
+    <hlm-toggle-group type="single" variant="outline" [nullable]="false" [value]="view()" (valueChange)="setView($event)" aria-label="Visualização dos produtos">
+      <button hlmToggleGroupItem value="grid">Cartões</button>
+      <button hlmToggleGroupItem value="table">Tabela</button>
+    </hlm-toggle-group>
+  </div>
+  <p class="my-4 text-sm text-muted-foreground" role="status">{{ products().length }} {{ products().length === 1 ? 'produto encontrado' : 'produtos encontrados' }}</p>
+  @if (!products().length) {
+    <div class="rounded-2xl border border-dashed border-border p-10 text-center"><h2 class="font-semibold">Nenhum produto encontrado</h2><p class="mt-2 text-sm text-muted-foreground">Tente outro nome ou cadastre um produto.</p>@if (query()) { <button hlmBtn variant="ghost" type="button" class="mt-4" (click)="query.set('')">Limpar pesquisa</button> }</div>
+  } @else if (view() === 'grid') {
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      @for (product of products(); track product.id) {
+        <button type="button" class="product-card overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm" (click)="open(product)">
+          <div class="aspect-[4/3] overflow-hidden bg-muted/40">@if (product.image) { <img [src]="product.image" alt="" class="h-full w-full object-cover" /> } @else { <span class="flex h-full items-center justify-center text-sm text-muted-foreground">Sem imagem</span> }</div>
+          <div class="p-5"><h2 class="break-words font-semibold">{{ product.name }}</h2><p class="mt-2 text-sm text-muted-foreground">{{ priceLabel(product) }}</p></div>
+        </button>
+      }
+    </div>
+  } @else {
+    <div hlmTableContainer class="rounded-2xl border border-border bg-card">
+      <table hlmTable class="w-full text-left text-sm"><thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="w-24 p-4 font-medium">Imagem</th><th hlmTh scope="col" class="p-4 font-medium">Nome do produto</th><th hlmTh scope="col" class="p-4 font-medium">Preço</th></tr></thead><tbody hlmTBody>
+        @for (product of products(); track product.id) {
+          <tr hlmTr class=""><td hlmTd class="p-4"><div class="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg bg-muted">@if (product.image) { <img [src]="product.image" alt="" class="h-full w-full object-cover" /> } @else { <span class="text-center text-xs text-muted-foreground">Sem imagem</span> }</div></td><td hlmTd class="p-4"><button hlmBtn variant="ghost" type="button" class="text-left font-medium underline-offset-4 hover:underline" (click)="open(product)">{{ product.name }}</button></td><td hlmTd class="p-4 text-muted-foreground">{{ priceLabel(product) }}</td></tr>
+        }
+      </tbody></table>
+    </div>
+  }
+
+  <hlm-dialog #productDialog (closed)="dialogClosed()" autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal [showCloseButton]="false" class="max-h-[90dvh] w-[min(94vw,720px)] max-w-none gap-0 overflow-auto p-0 sm:max-w-none">
+    <div class="flex items-center justify-between gap-4 border-b border-border p-5">
+      <h2 hlmDialogTitle id="product-dialog-title" class="text-xl font-semibold">{{ editing() ? (selected() ? 'Editar produto' : 'Cadastrar produto') : 'Detalhes do produto' }}</h2>
+      <button hlmBtn variant="ghost" type="button" aria-label="Fechar produto" (click)="close()">×</button>
+    </div>
+    @if (editing()) {
+      <form class="p-5 sm:p-6" (ngSubmit)="save()">
+        <label for="product-name" class="text-sm font-medium">Nome do produto <span aria-hidden="true">*</span></label>
+        <input hlmInput id="product-name" name="name" required maxlength="120" [(ngModel)]="name" class="mt-2" />
+        <label for="product-description" class="mt-5 block text-sm font-medium">Descrição</label>
+        <textarea hlmTextarea id="product-description" name="description" rows="4" maxlength="3000" [(ngModel)]="description" class="mt-2 h-auto min-h-28"></textarea>
+        <section class="mt-6 border-t border-border pt-5" aria-labelledby="sizes-heading">
+          <div class="flex flex-wrap items-center justify-between gap-3"><h3 id="sizes-heading" class="font-semibold">Tamanhos e preços</h3><button hlmBtn variant="outline" type="button" (click)="addSize()">+ Adicionar tamanho</button></div>
+          <p class="mt-2 text-xs leading-5 text-muted-foreground">Medidas em centímetros e preço de venda por peça, informado manualmente.</p>
+          <div class="mt-4 space-y-4">
+            @for (size of sizes; track size; let i = $index) {
+              <fieldset class="size-editor rounded-xl border border-border p-4">
+                <legend class="px-1 text-sm font-medium">Tamanho {{ i + 1 }}</legend>
+                <label class="block text-xs font-medium">Nome<input hlmInput [id]="'size-name-' + i" [name]="'size-name-' + i" [attr.data-size-name]="i" [(ngModel)]="size.name" required maxlength="60" placeholder="Ex.: Pequeno" class="mt-2" /></label>
+                <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label class="text-xs font-medium">Altura (cm)<input hlmInput type="number" [id]="'size-height-' + i" [name]="'size-height-' + i" [(ngModel)]="size.heightCm" min="0.01" step="0.01" required class="mt-2" /></label>
+                  <label class="text-xs font-medium">Largura (cm)<input hlmInput type="number" [id]="'size-width-' + i" [name]="'size-width-' + i" [(ngModel)]="size.widthCm" min="0.01" step="0.01" required class="mt-2" /></label>
+                  <label class="text-xs font-medium">Profundidade (cm)<input hlmInput type="number" [id]="'size-depth-' + i" [name]="'size-depth-' + i" [(ngModel)]="size.depthCm" min="0.01" step="0.01" required class="mt-2" /></label>
+                </div>
+                <div class="mt-3 flex flex-wrap items-end justify-between gap-3"><label class="text-xs font-medium">Preço de venda (R$)<input hlmInput type="number" [id]="'size-price-' + i" [name]="'size-price-' + i" [(ngModel)]="size.price" min="0.01" step="0.01" required class="mt-2" /></label><button hlmBtn variant="destructive" type="button" class="text-sm text-destructive" [attr.aria-label]="'Remover tamanho ' + (i + 1)" (click)="sizes.splice(i, 1)">Remover tamanho</button></div>
+              </fieldset>
+            } @empty { <p class="text-sm text-muted-foreground">Nenhum tamanho cadastrado.</p> }
+          </div>
+          <div class="mt-4 flex items-center gap-3 text-sm"><hlm-checkbox inputId="custom-sizes" name="customSizes" [(ngModel)]="customSizes" /><label for="custom-sizes" class="cursor-pointer">Permitir medidas personalizadas sob orçamento</label></div>
+        </section>
+        <label for="product-image" class="mt-5 block text-sm font-medium">Imagem principal</label>
+        <input #principalUpload id="product-image" type="file" accept="image/jpeg,image/png,image/webp" (change)="chooseImage($event)" [disabled]="readingImage()" class="upload-input" tabindex="-1" />
+        <button hlmBtn variant="default" type="button" class="upload-button mt-3" (click)="principalUpload.click()" [disabled]="readingImage()" aria-describedby="principal-upload-help">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 16V4m-4 4 4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></svg>
+          {{ image() ? 'Trocar imagem principal' : 'Escolher imagem principal' }}
+        </button>
+        <p id="principal-upload-help" class="mt-2 text-xs text-muted-foreground">Opcional · JPG, PNG ou WebP, até 5 MB.</p>
+        @if (image()) { <img [src]="image()" alt="Prévia da imagem escolhida" class="mt-4 h-40 w-full rounded-lg bg-muted object-contain" /><button hlmBtn variant="ghost" type="button" class="mt-2" (click)="image.set('')">Remover imagem</button> }
+        <label for="product-gallery" class="mt-5 block text-sm font-medium">Galeria de imagens</label>
+        <input #galleryUpload id="product-gallery" type="file" multiple accept="image/jpeg,image/png,image/webp" [disabled]="readingImage()" (change)="chooseImage($event, 'gallery')" class="upload-input" tabindex="-1" />
+        <button hlmBtn variant="default" type="button" class="upload-button mt-3" (click)="galleryUpload.click()" [disabled]="readingImage()" aria-describedby="gallery-upload-help">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8" cy="8" r="1" /><path d="m21 15-5-5L5 21M16 15v6m-3-3h6" /></svg>
+          Adicionar imagens à galeria
+        </button>
+        <p id="gallery-upload-help" class="mt-2 text-xs text-muted-foreground">Opcional · selecione uma ou mais imagens. Até 5 MB por imagem.</p>
+        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          @for (item of gallery(); track $index) {
+            <div class="overflow-hidden rounded-lg border border-border p-2">
+              @if (item) { <img [src]="item" alt="Imagem adicional do produto" class="h-24 w-full object-contain" /> }
+              @else { <span class="flex h-24 items-center justify-center text-xs text-muted-foreground">Sem imagem</span> }
+              <button hlmBtn variant="ghost" type="button" (click)="removeGalleryImage($index)" [attr.aria-label]="'Remover imagem adicional ' + ($index + 1)">Remover</button>
+            </div>
+          }
+        </div>
+        @if (readingImage()) { <p role="status" class="mt-3 text-sm">Carregando imagem…</p> }
+        @if (error()) { <p role="alert" class="mt-3 text-sm text-destructive">{{ error() }}</p> }
+        <div class="mt-6 flex flex-wrap justify-end gap-3"><button hlmBtn variant="outline" type="button" (click)="cancelEdit()">Cancelar</button><button hlmBtn variant="default" type="submit" [disabled]="readingImage()">Salvar produto</button></div>
+      </form>
+    } @else if (selected(); as product) {
+      <div class="p-5 sm:p-6">
+        <app-product-gallery [name]="product.name" [principal]="product.image" [gallery]="product.gallery" />
+        <h3 class="mt-6 break-words text-2xl font-semibold">{{ product.name }}</h3>
+        <section class="mt-5" aria-labelledby="product-sizes-title">
+          <h4 id="product-sizes-title" class="text-sm font-medium">Opções da peça</h4>
+          <p class="mt-1 text-xs text-muted-foreground">Peso por peça · medidas em altura × largura × profundidade.</p>
+          <hlm-radio-group class="mt-3 grid-cols-1 sm:grid-cols-3" [value]="selectedSizeIndex()" (valueChange)="selectedSizeIndex.set($event)" aria-label="Tamanhos disponíveis">
+            @for (size of product.sizes; track $index) {
+              <label class="size-option block cursor-pointer rounded-lg border border-border bg-card px-3 py-2 text-left has-checked:border-primary has-checked:bg-secondary has-checked:ring-1 has-checked:ring-primary has-focus-visible:ring-2 has-focus-visible:ring-ring"><hlm-radio [value]="$index" class="w-full"><span class="block w-full">
+                <span class="block text-sm font-semibold">{{ size.weightGrams != null ? measure(size.weightGrams!) + ' g' : 'Peso não informado' }}</span>
+                <span class="mt-1 block text-sm">{{ money(size.price) }}</span>
+                <span class="mt-2 block text-xs leading-5 text-muted-foreground">{{ measure(size.heightCm) }} × {{ measure(size.widthCm) }} × {{ measure(size.depthCm) }} cm</span>
+              </span></hlm-radio></label>
+            }
+          </hlm-radio-group>
+          @if (selectedSize(); as size) {
+            <div class="mt-4 rounded-xl border border-border bg-muted/30 p-4" aria-live="polite">
+              <p class="text-xs text-muted-foreground">Preço por peça · {{ size.weightGrams != null ? measure(size.weightGrams!) + ' g' : 'Peso não informado' }}</p><p class="mt-1 text-2xl font-semibold">{{ money(size.price) }}</p>
+              <dl class="mt-4 grid grid-cols-3 gap-3 text-sm"><div><dt class="text-xs text-muted-foreground">Altura</dt><dd class="mt-1 font-medium">{{ measure(size.heightCm) }} cm</dd></div><div><dt class="text-xs text-muted-foreground">Largura</dt><dd class="mt-1 font-medium">{{ measure(size.widthCm) }} cm</dd></div><div><dt class="text-xs text-muted-foreground">Profundidade</dt><dd class="mt-1 font-medium">{{ measure(size.depthCm) }} cm</dd></div></dl>
+            </div>
+          } @else { <p class="mt-3 text-sm text-muted-foreground">Nenhum tamanho com preço cadastrado.</p> }
+          @if (product.customSizes) { <p class="mt-4 rounded-lg bg-secondary p-3 text-sm text-secondary-foreground">Também disponível em medidas personalizadas, sob orçamento.</p> }
+        </section>
+        <h4 class="mt-4 text-sm font-medium">Descrição</h4><p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{{ product.description || 'Nenhuma descrição informada.' }}</p>
+        <div class="mt-6 flex justify-end gap-3"><button hlmBtn variant="outline" type="button" (click)="close()">Fechar</button><button hlmBtn variant="default" type="button" (click)="edit()">Editar produto</button></div>
+      </div>
+    }
+  </hlm-dialog-content>
+  </hlm-dialog>
+</section>
