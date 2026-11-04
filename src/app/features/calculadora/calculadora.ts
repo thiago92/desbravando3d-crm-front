@@ -5,28 +5,7 @@ import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { EnergySettings } from './energy-settings/energy-settings';
 import { PrintCalculator } from './print-calculator/print-calculator';
-
-interface PricingPercentage {
-  id: number;
-  name: string;
-  percentage: number;
-}
-
-const storageKey = 'crm-pricing-percentages-preview';
-
-function readPercentages(): PricingPercentage[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-    if (!Array.isArray(stored)) return [];
-    return stored.filter((item): item is PricingPercentage =>
-      typeof item?.id === 'number' && Number.isSafeInteger(item.id) &&
-      typeof item?.name === 'string' && item.name.trim().length > 0 &&
-      typeof item?.percentage === 'number' && Number.isFinite(item.percentage) && item.percentage >= 0,
-    );
-  } catch {
-    return [];
-  }
-}
+import { PricingPercentage, percentagesStorageKey, readPercentages } from './pricing-settings-preview';
 
 @Component({
   selector: 'app-calculadora',
@@ -77,7 +56,7 @@ export class Calculadora {
 
   private persist(entries: PricingPercentage[]): void {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(entries));
+      localStorage.setItem(percentagesStorageKey, JSON.stringify(entries));
     } catch {
       this.error.set('O navegador não permitiu salvar os dados. Eles ficarão disponíveis apenas nesta visita.');
     }

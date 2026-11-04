@@ -1,56 +1,138 @@
 import { TestBed } from '@angular/core/testing';
 import { FilamentsPreview } from '../insumos/filaments-preview';
+import { ProductsPreview } from '../produtos/products-preview';
 import { orderColumn, OrdersPreview } from './orders-preview';
 
 describe('Regras de encomendas', () => {
-  it('usa a mesma etapa para solicitações e orçamento e deriva a coluna pela presença de valor', () => {
-    const service = TestBed.inject(OrdersPreview);
-    const current = () => service.orders().find((order) => order.number === '#014')!;
-    expect(current().stage).toBe('request');
-    expect(orderColumn(current())).toBe('request');
-    service.saveQuote(current().id, 150);
-    expect(current().stage).toBe('request');
-    expect(orderColumn(current())).toBe('quotation');
-    service.saveQuote(current().id, 0);
-    expect(orderColumn(current())).toBe('quotation');
-    service.saveQuote(current().id, null);
-    expect(current().stage).toBe('request');
-    expect(orderColumn(current())).toBe('request');
+  beforeEach(() => {
+    localStorage.removeItem('crm-pricing-percentages-preview');
+    localStorage.removeItem('crm-energy-settings-preview');
   });
 
-  it('não confirma nem reduz o estoque ao precificar e impede confirmação sem estimativas', () => {
+  it('mantém uma única coluna de orçamento com preços calculados por produto', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const order = service.orders()[0];
+    const price = service.priceFor(order)!;
+    expect(orderColumn(order)).toBe('request');
+    expect(order.items.map((item) => item.productId)).toEqual(['preview-1', 'preview-3', 'preview-2']);
+    expect(price.items).toHaveLength(3);
+    expect(price.items[0].lineTotal).toBeCloseTo(price.items[0].unitPrice * 2, 2);
+    expect(price.total).toBe(price.subtotal);
+  });
+
+  it('aplica desconto apenas sobre a soma de todos os produtos', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const id = service.orders()[0].id;
+    const before = service.priceFor(service.orders()[0])!;
+    expect(service.saveDiscount(id, 10)).toHaveProperty('saved');
+    const after = service.priceFor(service.orders()[0])!;
+    expect(after.items).toEqual(before.items);
+    expect(after.subtotal).toBe(before.subtotal);
+    expect(after.discountAmount).toBeCloseTo(Math.round(before.subtotal * 10) / 100, 2);
+    expect(after.total).toBeCloseTo(after.subtotal - after.discountAmount, 2);
+    for (const value of [-1, 100.01, NaN, 1.001]) expect(service.saveDiscount(id, value)).toHaveProperty('error');
+  });
+
+  it('usa a tarifa e a potência cadastradas no orçamento aberto e preserva pedidos confirmados', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const request = service.orders()[0];
+    const confirmed = service.orders().find((order) => order.number === '#010')!;
+    const original = service.priceFor(request)!;
+    const frozen = service.priceFor(confirmed)!;
+    localStorage.setItem('crm-energy-settings-preview', JSON.stringify([{ id: 1, tariffPerKwh: 1.6, averagePowerW: 300, createdAt: new Date().toISOString() }]));
+    const updated = service.priceFor(request)!;
+    expect(updated.items[0].energyCost).toBeCloseTo(original.items[0].energyCost * 4, 6);
+    expect(updated.total).toBeGreaterThan(original.total);
+    expect(service.priceFor(confirmed)?.total).toBe(frozen.total);
+  });
+
+  it('lê o consumo do tamanho no catálogo e congela a configuração após confirmar', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const catalog = TestBed.inject(ProductsPreview);
+    const id = service.orders().find((order) => order.number === '#013')!.id;
+    const current = () => service.orders().find((order) => order.id === id)!;
+    const product = catalog.products().find((entry) => entry.id === 'preview-1')!;
+    const { id: productId, ...details } = product;
+    const before = service.priceFor(current())!.items[0].materialCost;
+    const changeGrams = (grams: number) => catalog.save({ ...details, sizes: product.sizes.map((size) => size.id === 'vase-small' ? { ...size, materials: [{ filamentId: 'filament-preview-1', gramsPerUnit: grams }] } : size) }, productId);
+    changeGrams(70);
+    expect(service.priceFor(current())!.items[0].materialCost).toBeGreaterThan(before);
+    expect(service.advance(id, 'confirmed')).toHaveProperty('saved');
+    const frozen = service.priceFor(current())!.total;
+    changeGrams(30);
+    expect(service.priceFor(current())!.total).toBe(frozen);
+    expect(service.sizeFor(current().items[0])?.materials[0].gramsPerUnit).toBe(70);
+    expect(service.saveItemSelection(id, 0, 'vase-medium', 3)).toHaveProperty('error');
+  });
+
+  it('confirma apenas com estoque suficiente e preserva o preço após alterar o preço do filamento', () => {
     const service = TestBed.inject(OrdersPreview);
     const inventory = TestBed.inject(FilamentsPreview);
-    const before = inventory.filaments();
-    const order = service.orders()[0];
-    expect(service.advance(order.id, 'confirmed')).toHaveProperty('error');
-    service.saveQuote(order.id, 150);
-    expect(service.advance(order.id, 'confirmed')).toHaveProperty('error');
-    expect(service.orders()[0].stage).toBe('request');
-    expect(inventory.filaments()).toEqual(before);
+    const id = service.orders().find((order) => order.number === '#013')!.id;
+    const before = inventory.filaments().find((filament) => filament.id === 'filament-preview-2')!.balanceGrams;
+    expect(service.saveItemSelection(id, 0, 'vase-medium', 3)).toHaveProperty('saved');
+    const expected = service.priceFor(service.orders().find((order) => order.id === id)!)!;
+    expect(service.advance(id, 'confirmed')).toHaveProperty('saved');
+    expect(inventory.filaments().find((filament) => filament.id === 'filament-preview-2')!.balanceGrams).toBe(before - 560);
+    expect(service.advance(id, 'confirmed')).toHaveProperty('error');
+    const filament = inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!;
+    inventory.save({ name: filament.name, material: filament.material, color: filament.color, pricePerKg: 200 }, { mode: 'add', grams: null }, filament.id);
+    expect(service.priceFor(service.orders().find((order) => order.id === id)!)?.total).toBe(expected.total);
   });
 
-  it('avança produção e entrega sem exigir pagamento e bloqueia saltos e reenvio da mesma ação', () => {
+  it('devolve somente o consumo baixado ao voltar de Confirmadas e libera novo orçamento', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const id = service.orders().find((order) => order.number === '#013')!.id;
+    const balance = inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams;
+    expect(service.advance(id, 'confirmed')).toHaveProperty('saved');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(balance - 200);
+    expect(service.saveDiscount(id, 5)).toHaveProperty('error');
+    expect(service.returnToQuote(id)).toHaveProperty('saved');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(balance);
+    expect(service.priceFor(service.orders().find((order) => order.id === id)!)?.total).not.toBeNull();
+    expect(service.saveDiscount(id, 5)).toHaveProperty('saved');
+    expect(service.returnToQuote(id)).toHaveProperty('error');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(balance);
+    expect(service.advance(id, 'confirmed')).toHaveProperty('saved');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(balance - 200);
+    expect(service.advance(id, 'printing')).toHaveProperty('saved');
+    expect(service.returnToQuote(id)).toHaveProperty('error');
+  });
+
+  it('bloqueia confirmação sem saldo em uma cor sem baixar as demais', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const id = service.orders()[0].id;
+    expect(service.advance(id, 'confirmed')).toHaveProperty('error');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-2')?.balanceGrams).toBe(1000);
+    expect(service.orders()[0].stage).toBe('request');
+  });
+
+  it('valida tamanho, margem e prazo antes de alterar o pedido', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const id = service.orders()[0].id;
+    const originalPrice = service.priceFor(service.orders()[0])!.items[0].unitPrice;
+    expect(service.saveItemSelection(id, 0, 'not-a-size', 3)).toHaveProperty('error');
+    expect(service.saveItemSelection(id, 0, 'vase-small', 999)).toHaveProperty('error');
+    expect(service.saveDeliveryDate(id, '2026-02-31')).toHaveProperty('error');
+    expect(service.saveDeliveryDate(id, '2026-11-20')).toHaveProperty('saved');
+    expect(service.saveDeliveryDate(id, null)).toHaveProperty('saved');
+    expect(service.orders()[0].deliveryDate).toBeNull();
+    expect(service.saveItemSelection(id, 0, 'vase-small', 1)).toHaveProperty('saved');
+    expect(service.orders()[0].items[0].sizeId).toBe('vase-small');
+    expect(service.priceFor(service.orders()[0])!.items[0].marginName).toBe('Lojas');
+    expect(service.priceFor(service.orders()[0])!.items[0].unitPrice).toBeLessThan(originalPrice);
+  });
+
+  it('avança produção e entrega sem exigir pagamento e rejeita saltos', () => {
     const service = TestBed.inject(OrdersPreview);
     const id = service.orders().find((order) => order.number === '#011')!.id;
-    const current = () => service.orders().find((order) => order.id === id)!;
     expect(service.advance(id, 'delivered')).toHaveProperty('error');
-    expect(current().stage).toBe('confirmed');
     expect(service.advance(id, 'printing')).toHaveProperty('saved');
     expect(service.advance(id, 'printing')).toHaveProperty('error');
-    expect(current().stage).toBe('printing');
     expect(service.advance(id, 'ready')).toHaveProperty('saved');
     expect(service.advance(id, 'delivered')).toHaveProperty('saved');
-    expect(current().payment).toBe('pending');
-    expect(service.advance(id, 'request')).toHaveProperty('error');
-    expect(service.saveQuote(id, 999)).toHaveProperty('error');
-    expect(current().quotedTotal).toBe(150);
-  });
-
-  it('valida o valor informado sem alterar a encomenda em caso de erro', () => {
-    const service = TestBed.inject(OrdersPreview);
-    const original = service.orders()[0];
-    for (const amount of [-1, NaN, Infinity, 1.001]) expect(service.saveQuote(original.id, amount)).toHaveProperty('error');
-    expect(service.orders()[0]).toEqual(original);
+    expect(service.orders().find((order) => order.id === id)?.payment).toBe('pending');
   });
 });

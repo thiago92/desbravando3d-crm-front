@@ -43,6 +43,33 @@ export class FilamentsPreview {
   ]);
   readonly filaments = this.entries.asReadonly();
 
+  consume(requirements: ReadonlyMap<string, number>): { error: string } | { consumed: true } {
+    for (const [id, grams] of requirements) {
+      const filament = this.entries().find((item) => item.id === id);
+      if (!filament || !validAmount(grams) || grams <= 0) return { error: 'Revise os filamentos e as quantidades previstas.' };
+      if (filament.balanceGrams < grams) return { error: `Estoque insuficiente de ${filament.name}. Registre uma entrada antes de confirmar.` };
+    }
+    this.entries.update((items) => items.map((item) => {
+      const grams = requirements.get(item.id);
+      return grams === undefined ? item : { ...item, balanceGrams: (Math.round(item.balanceGrams * 100) - Math.round(grams * 100)) / 100 };
+    }));
+    return { consumed: true };
+  }
+
+  restore(requirements: ReadonlyMap<string, number>): { error: string } | { restored: true } {
+    for (const [id, grams] of requirements) {
+      const filament = this.entries().find((item) => item.id === id);
+      if (!filament || !validAmount(grams) || grams <= 0 || !validAmount(filament.balanceGrams + grams)) {
+        return { error: 'Não foi possível devolver o consumo previsto ao estoque.' };
+      }
+    }
+    this.entries.update((items) => items.map((item) => {
+      const grams = requirements.get(item.id);
+      return grams === undefined ? item : { ...item, balanceGrams: (Math.round(item.balanceGrams * 100) + Math.round(grams * 100)) / 100 };
+    }));
+    return { restored: true };
+  }
+
   save(details: FilamentDetails, adjustment: StockAdjustment, id?: string): SaveResult {
     const current = id ? this.entries().find((item) => item.id === id) : undefined;
     if (id && !current) return { error: 'Este filamento não está mais disponível. Reabra o cadastro.' };

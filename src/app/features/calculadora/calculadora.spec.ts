@@ -29,11 +29,9 @@ describe('Calculadora: cadastro de percentuais', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(root.querySelectorAll('tbody tr')).toHaveLength(1);
+    expect(root.querySelector('tbody')?.querySelectorAll('tr')).toHaveLength(4);
     expect(root.querySelector('tbody')?.textContent).toContain('Consignado');
     expect(root.querySelector('tbody')?.textContent).toContain('100%');
-    expect(JSON.parse(localStorage.getItem('crm-pricing-percentages-preview') ?? '[]')).toEqual([
-      { id: 1, name: 'Consignado', percentage: 100 },
-    ]);
+    expect(JSON.parse(localStorage.getItem('crm-pricing-percentages-preview') ?? '[]')).toContainEqual({ id: 4, name: 'Consignado', percentage: 100 });
   });
 });

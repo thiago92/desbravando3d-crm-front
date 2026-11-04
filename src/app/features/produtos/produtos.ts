@@ -10,17 +10,21 @@ import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { HlmRadioGroupImports } from '@spartan-ng/helm/radio-group';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
+import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
+import { FilamentsPreview } from '../insumos/filaments-preview';
 import { formatMeasure, formatMoney, normalizeSearch } from '../../shared/utils/presentation';
 
 @Component({
   selector: 'app-produtos',
-  imports: [FormsModule, ProductGallery, HlmButton, HlmInput, ...HlmDialogImports, ...HlmTableImports, ...HlmToggleGroupImports, ...HlmRadioGroupImports, HlmTextarea, HlmCheckbox],
+  imports: [FormsModule, ProductGallery, HlmButton, HlmInput, ...HlmDialogImports, ...HlmTableImports, ...HlmToggleGroupImports, ...HlmRadioGroupImports, ...HlmNativeSelectImports, HlmTextarea, HlmCheckbox],
   templateUrl: './produtos.html',
   styleUrl: './produtos.css',
 })
 export class Produtos {
   @ViewChild('productDialog') private dialog?: HlmDialog;
   private readonly catalog = inject(ProductsPreview);
+  private readonly inventory = inject(FilamentsPreview);
+  protected readonly filaments = this.inventory.filaments;
   protected readonly query = signal('');
   protected readonly view = signal<'grid' | 'table'>('grid');
   protected readonly selected = signal<ProductPreview | null>(null);
@@ -35,7 +39,7 @@ export class Produtos {
   });
   protected name = '';
   protected description = '';
-  protected sizes: { name: string; heightCm: number | null; widthCm: number | null; depthCm: number | null; price: number | null }[] = [];
+  protected sizes: { id: string; name: string; heightCm: number | null; widthCm: number | null; depthCm: number | null; price: number | null; printHours: number | null; weightGrams?: number | null; materials: { filamentId: string; gramsPerUnit: number | null }[] }[] = [];
   protected customSizes = false;
   protected readonly selectedSizeIndex = signal(0);
   protected readonly selectedSize = computed(() => this.selected()?.sizes[this.selectedSizeIndex()] ?? null);
@@ -55,7 +59,7 @@ export class Produtos {
     const product = this.selected();
     this.name = product?.name ?? '';
     this.description = product?.description ?? '';
-    this.sizes = (product?.sizes ?? []).map((size) => ({ ...size }));
+    this.sizes = (product?.sizes ?? []).map((size) => ({ ...size, materials: size.materials.map((line) => ({ ...line })) }));
     this.customSizes = product?.customSizes ?? false;
     this.image.set(product?.image ?? '');
     this.gallery.set([...(product?.gallery ?? [])]);
@@ -65,7 +69,14 @@ export class Produtos {
   protected edit(): void { this.fillForm(); this.editing.set(true); }
 
   protected addSize(): void {
-    this.sizes.push({ name: '', heightCm: null, widthCm: null, depthCm: null, price: null });
+    this.sizes.push({ id: crypto.randomUUID(), name: '', heightCm: null, widthCm: null, depthCm: null, price: null, printHours: null, materials: [] });
+  }
+
+  protected addSizeMaterial(index: number): void { this.sizes[index].materials.push({ filamentId: '', gramsPerUnit: null }); }
+  protected removeSizeMaterial(index: number, line: number): void { this.sizes[index].materials.splice(line, 1); }
+  protected filamentName(id: string): string {
+    const filament = this.filaments().find((entry) => entry.id === id);
+    return filament ? `${filament.material} ${filament.color}` : 'Filamento indisponível';
   }
 
   protected readonly money = formatMoney;
@@ -144,7 +155,12 @@ export class Produtos {
       this.error.set('Preencha o nome, as três medidas e o preço de cada tamanho com valores maiores que zero.');
       return;
     }
-    const sizes = this.sizes.map((size) => ({ ...size, name: size.name.trim() })) as ProductSize[];
+    const validPositive = (value: number | null): boolean => value !== null && Number.isFinite(value) && value > 0 && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < 0.000001;
+    if (this.sizes.some((size) => !validPositive(size.printHours) || !size.materials.length || size.materials.some((line) => !this.filaments().some((filament) => filament.id === line.filamentId) || !validPositive(line.gramsPerUnit)) || new Set(size.materials.map((line) => line.filamentId)).size !== size.materials.length)) {
+      this.error.set('Informe horas de impressão e pelo menos um filamento por tamanho, com gramas por unidade maiores que zero e sem repetir filamentos. Use até duas casas decimais.');
+      return;
+    }
+    const sizes = this.sizes.map((size) => ({ ...size, name: size.name.trim(), printHours: size.printHours!, materials: size.materials.map((line) => ({ filamentId: line.filamentId, gramsPerUnit: line.gramsPerUnit! })) })) as ProductSize[];
     const saved = this.catalog.save({ name: this.name.trim(), description: this.description.trim(), image: this.image() || null, gallery: this.gallery().length ? [...this.gallery()] : null, sizes, customSizes: this.customSizes }, this.selected()?.id);
     this.selected.set(saved);
     this.selectedSizeIndex.set(0);

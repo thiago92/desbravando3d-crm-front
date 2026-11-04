@@ -3,7 +3,7 @@
   <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight">Encomendas</h1>
-      <p class="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Acompanhe cada encomenda, da solicitação até a entrega.</p>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Acompanhe cada encomenda, do orçamento até a entrega.</p>
     </div>
     <div class="sm:text-right">
       <button hlmBtn type="button" disabled aria-describedby="new-order-help">+ Nova encomenda</button>
@@ -45,11 +45,11 @@
               <button hlmBtn variant="ghost" type="button" class="h-auto w-full flex-col items-stretch gap-3 whitespace-normal rounded-xl p-4 text-left font-normal" [attr.aria-label]="'Ver encomenda ' + order.number + ' de ' + order.customer" (click)="open(order)">
                 <span class="flex items-center gap-2"><span class="text-xs font-semibold text-muted-foreground">{{ order.number }}</span></span>
                 <span class="break-words text-base font-semibold leading-5">{{ order.customer }}</span>
-                @if (columnFor(order) === 'quotation') { <span class="w-fit rounded-md bg-secondary px-2 py-1 text-[11px] font-medium text-secondary-foreground">Aguardando cliente</span> }
+                @if (order.stage === 'request') { <span class="w-fit rounded-md bg-secondary px-2 py-1 text-[11px] font-medium text-secondary-foreground">Aguardando cliente</span> }
                 <span class="break-words text-sm leading-6 text-muted-foreground">{{ summary(order) }}</span>
                 <span class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-sm">
                   <span class="text-muted-foreground">{{ units(order) }} {{ units(order) === 1 ? 'peça' : 'peças' }}</span>
-                  <span class="font-semibold">{{ order.quotedTotal === null ? 'Valor a definir' : money(order.quotedTotal) }}</span>
+                  <span class="font-semibold">{{ priceFor(order) ? money(priceFor(order)!.total) : 'Configurar precificação' }}</span>
                 </span>
                 <span class="flex items-center gap-2 text-xs text-muted-foreground"><span aria-hidden="true" class="size-1.5 rounded-full" [class]="order.payment === 'received' ? 'bg-emerald-600' : order.payment === 'pending' ? 'bg-amber-600' : 'bg-muted-foreground'"></span>{{ paymentLabel(order) }}</span>
               </button>
@@ -63,7 +63,7 @@
   </div>
 
   <hlm-dialog #orderDialog autoFocus="dialog" (closed)="dialogClosed()">
-    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar encomenda" class="max-h-[90dvh] w-[min(94vw,640px)] max-w-none overflow-auto sm:max-w-none">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar encomenda" class="max-h-[90dvh] w-[min(96vw,1000px)] max-w-none overflow-auto sm:max-w-none">
       @if (selected(); as order) {
         <hlm-dialog-header>
           <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Encomenda {{ order.number }}</h2>
@@ -74,35 +74,81 @@
           <h3 class="mt-1 text-xl font-semibold">{{ order.customer }}</h3>
           <div class="mt-4 flex flex-wrap gap-2 text-xs">
             <span class="rounded-md bg-secondary px-3 py-2 font-medium text-secondary-foreground">{{ selectedStage()?.label }}</span>
-            @if (columnFor(order) === 'quotation') { <span class="rounded-md border border-border px-3 py-2">Aguardando cliente</span> }
+            @if (order.stage === 'request') { <span class="rounded-md border border-border px-3 py-2">Aguardando cliente</span> }
           </div>
         </div>
         <section aria-labelledby="order-items-heading">
-          <div class="flex items-center justify-between gap-3"><h4 id="order-items-heading" class="font-semibold">Itens da encomenda</h4><p class="text-xs text-muted-foreground">{{ units(order) }} {{ units(order) === 1 ? 'peça' : 'peças' }} no total</p></div>
+          <div class="flex items-center justify-between gap-3"><h4 id="order-items-heading" class="font-semibold">Produtos da encomenda</h4><p class="text-xs text-muted-foreground">{{ units(order) }} {{ units(order) === 1 ? 'peça' : 'peças' }} no total</p></div>
           <ul class="mt-3 divide-y divide-border rounded-lg border border-border px-4">
-            @for (item of order.items; track $index) {
-              <li class="flex items-start justify-between gap-4 py-3 text-sm"><span class="break-words">{{ item.name }}</span><span class="shrink-0 text-muted-foreground">{{ item.quantity }} {{ item.quantity === 1 ? 'unidade' : 'unidades' }}</span></li>
+            @for (item of order.items; track $index; let itemIndex = $index) {
+              <li class="py-4 text-sm">
+                <div class="flex items-start gap-3">
+                  <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-center text-xs text-muted-foreground sm:size-24">
+                    @if (productImage(item); as image) { <img class="size-full object-contain" [src]="image" [alt]="'Imagem de ' + productName(item)" (error)="imageFailed(item)" /> }
+                    @else { <span>Sem imagem</span> }
+                  </div>
+                  <div class="min-w-0 flex-1"><p class="break-words font-medium">{{ productName(item) }}</p><p class="mt-1 text-xs text-muted-foreground">{{ productOption(item) }}</p><p class="mt-2 text-xs text-muted-foreground">{{ item.quantity }} {{ item.quantity === 1 ? 'unidade' : 'unidades' }}</p></div>
+                </div>
+                @if (order.stage === 'request') {
+                  <div class="mt-4 space-y-3 rounded-lg bg-muted/50 p-3">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <div><label class="mb-1 block text-xs" [for]="'order-size-' + itemIndex">Tamanho do produto</label><hlm-native-select class="w-full" [selectId]="'order-size-' + itemIndex" [name]="'order-size-' + itemIndex" [(ngModel)]="sizeDrafts[itemIndex]"><option hlmNativeSelectOption value="">Escolha o tamanho</option>@for (size of sizeOptions(item); track size.id) { <option hlmNativeSelectOption [value]="size.id">{{ size.name }} · {{ measure(size.heightCm) }} × {{ measure(size.widthCm) }} × {{ measure(size.depthCm) }} cm</option> }</hlm-native-select></div>
+                      <div><label class="mb-1 block text-xs" [for]="'margin-' + itemIndex">Margem de lucro</label><hlm-native-select class="w-full" [selectId]="'margin-' + itemIndex" [name]="'margin-' + itemIndex" [ngModel]="marginDrafts[itemIndex]" (ngModelChange)="marginDrafts[itemIndex] = +$event"><option hlmNativeSelectOption value="">Escolha a margem</option>@for (margin of margins; track margin.id) { <option hlmNativeSelectOption [value]="margin.id">{{ margin.name }} · {{ margin.percentage }}%</option> }</hlm-native-select></div>
+                    </div>
+                    <button hlmBtn size="sm" type="button" (click)="saveItemSelection(itemIndex)">Salvar tamanho e margem</button>
+                    <p class="text-xs text-muted-foreground">Filamentos, gramas e horas vêm do tamanho cadastrado em Produtos. O estoque considera todas as unidades na confirmação.</p>
+                  </div>
+                }
+                @if (sizeFor(item); as size) {
+                  <div class="mt-3 text-xs text-muted-foreground"><p class="font-medium">Consumo cadastrado no tamanho · {{ measure(size.printHours) }} h de impressão por unidade</p>@for (material of size.materials; track material.filamentId) { <p class="mt-1">{{ filamentName(material.filamentId) }}: {{ measure(material.gramsPerUnit) }} g por unidade · {{ measure(material.gramsPerUnit * item.quantity) }} g no total</p> }</div>
+                } @else { <p class="mt-2 text-xs text-muted-foreground">Tamanho não disponível no catálogo.</p> }
+                @if (selectedPrice()?.items?.[itemIndex]; as itemPrice) {
+                  <dl class="mt-3 grid gap-x-5 gap-y-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                    <div><dt class="text-muted-foreground">Filamento por peça</dt><dd class="font-medium">{{ measure(itemPrice.gramsPerUnit) }} g · média {{ money(itemPrice.weightedPricePerKg) }}/kg</dd></div>
+                    <div><dt class="text-muted-foreground">Custo do material</dt><dd class="font-medium">{{ money(itemPrice.materialCost) }}</dd></div>
+                    <div><dt class="text-muted-foreground">Custo da energia</dt><dd class="font-medium">{{ money(itemPrice.energyCost) }}</dd></div>
+                    <div><dt class="text-muted-foreground">Margem aplicada</dt><dd class="font-medium">{{ itemPrice.marginName }} · {{ itemPrice.markupPercent }}%</dd></div>
+                    <div><dt class="text-muted-foreground">Preço por unidade</dt><dd class="font-semibold">{{ money(itemPrice.unitPrice) }}</dd></div>
+                    <div><dt class="text-muted-foreground">Total do produto</dt><dd class="font-semibold">{{ money(itemPrice.lineTotal) }}</dd></div>
+                  </dl>
+                }
+              </li>
             }
           </ul>
         </section>
         <dl class="grid gap-4 rounded-xl bg-muted/50 p-4 sm:grid-cols-2">
-          <div><dt class="text-xs text-muted-foreground">Orçamento</dt><dd class="mt-1 text-xl font-semibold">{{ order.quotedTotal === null ? 'Valor a definir' : money(order.quotedTotal) }}</dd></div>
+          @if (selectedPrice(); as price) {
+            <div><dt class="text-xs text-muted-foreground">Subtotal dos produtos</dt><dd class="mt-1 text-sm font-semibold">{{ money(price.subtotal) }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">Desconto ({{ order.discountPercent }}%)</dt><dd class="mt-1 text-sm font-semibold">− {{ money(price.discountAmount) }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">Total do orçamento</dt><dd class="mt-1 text-xl font-semibold">{{ money(price.total) }}</dd></div>
+            <div><dt class="text-xs text-muted-foreground">Energia utilizada no cálculo</dt><dd class="mt-1 text-sm">{{ measure(price.averagePowerW) }} W · R$ {{ measure(price.tariffPerKwh) }}/kWh @if (price.energyIsExample) { <span class="text-muted-foreground">· exemplo de prévia</span> }</dd></div>
+          } @else { <div><dt class="text-xs text-muted-foreground">Orçamento</dt><dd class="mt-1 text-sm font-semibold">Configure a precificação dos produtos e a energia.</dd></div> }
           <div><dt class="text-xs text-muted-foreground">Pagamento</dt><dd class="mt-2 text-sm font-medium">{{ paymentLabel(order) }}</dd></div>
+          <div><dt class="text-xs text-muted-foreground">Prazo para entrega</dt><dd class="mt-2 text-sm font-medium">{{ deliveryLabel(order.deliveryDate) }}</dd></div>
         </dl>
         @if (order.stage === 'request') {
-          <form (ngSubmit)="saveQuote()" class="space-y-3 rounded-xl border border-border p-4">
-            <label for="order-quote-value" class="text-sm font-medium">Valor do orçamento (R$)</label>
-            <input hlmInput id="order-quote-value" name="quoteValue" type="number" min="0" step="0.01" [(ngModel)]="quoteValue" aria-describedby="order-quote-help" />
-            <p id="order-quote-help" class="text-xs leading-5 text-muted-foreground">Ao salvar um valor, a encomenda aparece em Em orçamento. Sem valor, aparece em Solicitações. O preenchimento não confirma a encomenda.</p>
-            <button hlmBtn variant="outline" type="submit">Salvar orçamento</button>
+          <form (ngSubmit)="saveDeliveryDate()" class="space-y-3 rounded-xl border border-border p-4">
+            <label for="order-delivery-date" class="text-sm font-medium">Prazo para entrega</label>
+            <input hlmInput id="order-delivery-date" name="deliveryDate" type="date" [(ngModel)]="deliveryDateValue" />
+            <p class="text-xs text-muted-foreground">Opcional enquanto o prazo não foi combinado.</p>
+            <button hlmBtn variant="outline" type="submit">Salvar prazo</button>
+          </form>
+        }
+        @if (order.stage === 'request') {
+          <form (ngSubmit)="saveDiscount()" class="space-y-3 rounded-xl border border-border p-4">
+            <label for="order-discount" class="text-sm font-medium">Desconto sobre o total da encomenda (%)</label>
+            <input hlmInput id="order-discount" name="discount" type="number" min="0" max="100" step="0.01" [(ngModel)]="discountValue" aria-describedby="order-discount-help" />
+            <p id="order-discount-help" class="text-xs leading-5 text-muted-foreground">O desconto é aplicado uma vez, depois de somar os preços de todos os produtos e unidades.</p>
+            <button hlmBtn variant="outline" type="submit">Salvar desconto</button>
             @if (notice()) { <p role="status" class="text-sm text-muted-foreground">{{ notice() }}</p> }
           </form>
         }
         @if (error()) { <p role="alert" class="text-sm text-destructive">{{ error() }}</p> }
-        @if (order.stage === 'request' && order.quotedTotal === null) { <p class="text-xs text-muted-foreground">Salve o valor do orçamento antes de confirmar a encomenda.</p> }
+        @if (order.stage === 'request' && !selectedPrice()) { <p class="text-xs text-muted-foreground">Complete a precificação e os valores de energia antes de confirmar.</p> }
         <hlm-dialog-footer>
           <button hlmBtn variant="outline" type="button" (click)="close()">Fechar</button>
-          @if (action(); as next) { <button hlmBtn type="button" [disabled]="advancing() || (order.stage === 'request' && order.quotedTotal === null)" (click)="advance()">{{ next.label }}</button> }
+          @if (order.stage === 'confirmed') { <button hlmBtn variant="outline" type="button" [disabled]="advancing()" (click)="returnToQuote()">Voltar para Em orçamento</button> }
+          @if (action(); as next) { <button hlmBtn type="button" [disabled]="advancing() || (order.stage === 'request' && !selectedPrice())" (click)="advance()">{{ next.label }}</button> }
         </hlm-dialog-footer>
       }
     </hlm-dialog-content>

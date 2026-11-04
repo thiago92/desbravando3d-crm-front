@@ -5,30 +5,7 @@ import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmDialog, HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { formatDateTime, formatMeasure, formatTariff } from '../../../shared/utils/presentation';
-
-interface EnergySetting {
-  id: number;
-  tariffPerKwh: number;
-  averagePowerW: number;
-  createdAt: string;
-}
-
-const storageKey = 'crm-energy-settings-preview';
-
-function readSettings(): EnergySetting[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-    if (!Array.isArray(stored)) return [];
-    return stored.filter((item): item is EnergySetting =>
-      typeof item?.id === 'number' && Number.isSafeInteger(item.id) &&
-      typeof item?.tariffPerKwh === 'number' && Number.isFinite(item.tariffPerKwh) && item.tariffPerKwh > 0 &&
-      typeof item?.averagePowerW === 'number' && Number.isFinite(item.averagePowerW) && item.averagePowerW > 0 &&
-      typeof item?.createdAt === 'string' && !Number.isNaN(Date.parse(item.createdAt)),
-    );
-  } catch {
-    return [];
-  }
-}
+import { energyStorageKey, readEnergySettings } from '../pricing-settings-preview';
 
 @Component({
   selector: 'app-energy-settings',
@@ -38,7 +15,7 @@ function readSettings(): EnergySetting[] {
 export class EnergySettings {
   @ViewChild('historyDialog') private historyDialog?: HlmDialog;
 
-  protected readonly settings = signal(readSettings());
+  protected readonly settings = signal(readEnergySettings());
   protected readonly history = computed(() => [...this.settings()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id));
   protected readonly latest = computed(() => this.history()[0] ?? null);
   protected readonly error = signal('');
@@ -53,7 +30,7 @@ export class EnergySettings {
       return;
     }
 
-    const entries = this.settings();
+    const entries = this.settings().filter((item) => item.id !== 0);
     const next = [...entries, {
       id: Math.max(0, ...entries.map((item) => item.id)) + 1,
       tariffPerKwh: tariff,
@@ -65,7 +42,7 @@ export class EnergySettings {
     this.averagePowerW = null;
     this.error.set('');
     try {
-      localStorage.setItem(storageKey, JSON.stringify(next));
+      localStorage.setItem(energyStorageKey, JSON.stringify(next));
     } catch {
       this.error.set('O navegador não permitiu salvar os dados. Eles ficarão disponíveis apenas nesta visita.');
     }

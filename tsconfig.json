@@ -28,7 +28,8 @@
       "@spartan-ng/helm/radio-group": ["./libs/ui/radio-group/src/index.ts"],
       "@spartan-ng/helm/textarea": ["./libs/ui/textarea/src/index.ts"],
       "@spartan-ng/helm/checkbox": ["./libs/ui/checkbox/src/index.ts"],
-      "@spartan-ng/helm/card": ["./libs/ui/card/src/index.ts"]
+      "@spartan-ng/helm/card": ["./libs/ui/card/src/index.ts"],
+      "@spartan-ng/helm/native-select": ["./libs/ui/native-select/src/index.ts"]
     }
   },
   "angularCompilerOptions": {

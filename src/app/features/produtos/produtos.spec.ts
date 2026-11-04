@@ -99,6 +99,15 @@ describe('Produtos: catálogo de prévia', () => {
     await fill('#size-width-0', '3');
     await fill('#size-depth-0', '2');
     await fill('#size-price-0', '12.90');
+    submit();
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('horas de impressão');
+    await fill('#size-hours-0', '1.5');
+    click('Adicionar filamento');
+    await fixture.whenStable();
+    const filament = root.querySelector<HTMLSelectElement>('#size-filament-0-0')!;
+    filament.value = 'filament-preview-2';
+    filament.dispatchEvent(new Event('change', { bubbles: true }));
+    await fill('#size-grams-0-0', '25');
     const checkbox = root.querySelector<HTMLElement>('[role=checkbox]')!;
     checkbox.click();
     await fixture.whenStable();
@@ -106,7 +115,7 @@ describe('Produtos: catálogo de prévia', () => {
     expect(root.querySelector('dl')?.textContent).toContain('5,5 cm');
     expect(root.querySelector('.size-option')?.textContent).toContain('Peso não informado');
     const saved = TestBed.inject(ProductsPreview).products().find((product) => product.name === 'Miniatura')!;
-    expect(saved.sizes[0]).toEqual({ name: 'Mini', heightCm: 5.5, widthCm: 3, depthCm: 2, price: 12.9 });
+    expect(saved.sizes[0]).toMatchObject({ name: 'Mini', heightCm: 5.5, widthCm: 3, depthCm: 2, price: 12.9, printHours: 1.5, materials: [{ filamentId: 'filament-preview-2', gramsPerUnit: 25 }] });
     expect(saved.customSizes).toBe(true);
     click('Editar produto');
     await fixture.whenStable();

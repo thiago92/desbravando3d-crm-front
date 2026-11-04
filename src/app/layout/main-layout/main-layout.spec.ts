@@ -48,7 +48,7 @@ describe('MainLayout', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(router.url).toBe('/encomendas');
-    expect(compiled.querySelectorAll('main .kanban-column')).toHaveLength(6);
+    expect(compiled.querySelectorAll('main .kanban-column')).toHaveLength(5);
 
     const darkButton = Array.from(compiled.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Escuro') as HTMLButtonElement;
     darkButton.click();

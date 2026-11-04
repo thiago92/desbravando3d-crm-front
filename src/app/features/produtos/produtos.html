@@ -62,6 +62,18 @@
                   <label class="text-xs font-medium">Largura (cm)<input hlmInput type="number" [id]="'size-width-' + i" [name]="'size-width-' + i" [(ngModel)]="size.widthCm" min="0.01" step="0.01" required class="mt-2" /></label>
                   <label class="text-xs font-medium">Profundidade (cm)<input hlmInput type="number" [id]="'size-depth-' + i" [name]="'size-depth-' + i" [(ngModel)]="size.depthCm" min="0.01" step="0.01" required class="mt-2" /></label>
                 </div>
+                <div class="mt-4 rounded-lg bg-muted/50 p-3">
+                  <label class="block text-xs font-medium" [for]="'size-hours-' + i">Horas de impressão por unidade<input hlmInput type="number" [id]="'size-hours-' + i" [name]="'size-hours-' + i" [(ngModel)]="size.printHours" min="0.01" step="0.01" class="mt-2" /></label>
+                  <p class="mt-4 text-xs font-medium">Filamentos usados por unidade</p>
+                  @for (line of size.materials; track $index; let lineIndex = $index) {
+                    <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                      <div><label class="mb-1 block text-xs" [for]="'size-filament-' + i + '-' + lineIndex">Filamento</label><hlm-native-select class="w-full" [selectId]="'size-filament-' + i + '-' + lineIndex" [name]="'size-filament-' + i + '-' + lineIndex" [(ngModel)]="line.filamentId"><option hlmNativeSelectOption value="">Escolha o filamento</option>@for (filament of filaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></div>
+                      <div><label class="mb-1 block text-xs" [for]="'size-grams-' + i + '-' + lineIndex">Gramas/unidade</label><input hlmInput type="number" [id]="'size-grams-' + i + '-' + lineIndex" [name]="'size-grams-' + i + '-' + lineIndex" [(ngModel)]="line.gramsPerUnit" min="0.01" step="0.01" /></div>
+                      <button hlmBtn variant="ghost" type="button" (click)="removeSizeMaterial(i, lineIndex)" [attr.aria-label]="'Remover filamento do tamanho ' + (i + 1)">Remover</button>
+                    </div>
+                  }
+                  <button hlmBtn variant="outline" size="sm" type="button" class="mt-3" (click)="addSizeMaterial(i)">Adicionar filamento</button>
+                </div>
                 <div class="mt-3 flex flex-wrap items-end justify-between gap-3"><label class="text-xs font-medium">Preço de venda (R$)<input hlmInput type="number" [id]="'size-price-' + i" [name]="'size-price-' + i" [(ngModel)]="size.price" min="0.01" step="0.01" required class="mt-2" /></label><button hlmBtn variant="destructive" type="button" class="text-sm text-destructive" [attr.aria-label]="'Remover tamanho ' + (i + 1)" (click)="sizes.splice(i, 1)">Remover tamanho</button></div>
               </fieldset>
             } @empty { <p class="text-sm text-muted-foreground">Nenhum tamanho cadastrado.</p> }
@@ -116,6 +128,7 @@
             <div class="mt-4 rounded-xl border border-border bg-muted/30 p-4" aria-live="polite">
               <p class="text-xs text-muted-foreground">Preço por peça · {{ size.weightGrams != null ? measure(size.weightGrams!) + ' g' : 'Peso não informado' }}</p><p class="mt-1 text-2xl font-semibold">{{ money(size.price) }}</p>
               <dl class="mt-4 grid grid-cols-3 gap-3 text-sm"><div><dt class="text-xs text-muted-foreground">Altura</dt><dd class="mt-1 font-medium">{{ measure(size.heightCm) }} cm</dd></div><div><dt class="text-xs text-muted-foreground">Largura</dt><dd class="mt-1 font-medium">{{ measure(size.widthCm) }} cm</dd></div><div><dt class="text-xs text-muted-foreground">Profundidade</dt><dd class="mt-1 font-medium">{{ measure(size.depthCm) }} cm</dd></div></dl>
+              <div class="mt-4 border-t border-border pt-3 text-sm"><p class="font-medium">Impressão: {{ measure(size.printHours) }} h por unidade</p><p class="mt-2 text-xs text-muted-foreground">Filamentos por unidade</p>@for (line of size.materials; track line.filamentId) { <p class="mt-1 text-xs">{{ filamentName(line.filamentId) }} · {{ measure(line.gramsPerUnit) }} g</p> }</div>
             </div>
           } @else { <p class="mt-3 text-sm text-muted-foreground">Nenhum tamanho com preço cadastrado.</p> }
           @if (product.customSizes) { <p class="mt-4 rounded-lg bg-secondary p-3 text-sm text-secondary-foreground">Também disponível em medidas personalizadas, sob orçamento.</p> }

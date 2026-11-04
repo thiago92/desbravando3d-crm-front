@@ -30,7 +30,7 @@
         <div class="overflow-x-auto">
           <table hlmTable class="w-full min-w-[520px] text-left text-sm">
             <thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th hlmTh scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
-            <tbody hlmTBody><tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td hlmTd class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td hlmTd class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr></tbody>
+            <tbody hlmTBody><tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td hlmTd class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td hlmTd class="px-5 py-4 sm:px-6">{{ item.id === 0 ? 'Exemplo de prévia' : formatDate(item.createdAt) }}</td></tr></tbody>
           </table>
         </div>
       } @else {
@@ -54,7 +54,7 @@
           <thead hlmTHead class="sticky top-0 bg-muted text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Tarifa de energia</th><th hlmTh scope="col" class="px-5 py-3 font-medium">Consumo médio</th><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Cadastrado em</th></tr></thead>
           <tbody hlmTBody>
             @for (item of history(); track item.id) {
-              <tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td hlmTd class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td hlmTd class="px-5 py-4 sm:px-6">{{ formatDate(item.createdAt) }}</td></tr>
+              <tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6">R$ {{ formatTariff(item.tariffPerKwh) }}/kWh</td><td hlmTd class="px-5 py-4">{{ formatPower(item.averagePowerW) }} W</td><td hlmTd class="px-5 py-4 sm:px-6">{{ item.id === 0 ? 'Exemplo de prévia' : formatDate(item.createdAt) }}</td></tr>
             }
           </tbody>
         </table>
