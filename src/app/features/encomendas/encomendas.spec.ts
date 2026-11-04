@@ -43,6 +43,18 @@ describe('Encomendas: prévia do kanban', () => {
     rect.mockRestore();
   });
 
+  it('mantém o quadro alto no celular quando os filtros ocupam a tela', () => {
+    const width = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
+    const height = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800);
+    const board = root.querySelector<HTMLElement>('.kanban-board')!;
+    const rect = vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({ top: 500 } as DOMRect);
+    window.dispatchEvent(new Event('resize'));
+    expect(parseFloat(board.style.getPropertyValue('--kanban-height'))).toBe(624);
+    rect.mockRestore();
+    height.mockRestore();
+    width.mockRestore();
+  });
+
   async function clickText(label: string): Promise<void> {
     [...root.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === label)!.click();
     fixture.detectChanges();

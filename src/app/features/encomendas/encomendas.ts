@@ -61,7 +61,8 @@ export class Encomendas {
       const fitBoard = () => {
         // Desconta a posição real do quadro, inclusive filtros/avisos e quebras de linha.
         const top = board.getBoundingClientRect().top + window.scrollY;
-        const height = `${Math.max(220, Math.floor(window.innerHeight - top - 32))}px`;
+        const minimum = window.innerWidth < 640 ? Math.max(220, Math.floor(window.innerHeight * 0.78)) : 220;
+        const height = `${Math.max(minimum, Math.floor(window.innerHeight - top - 32))}px`;
         if (board.style.getPropertyValue('--kanban-height') !== height) board.style.setProperty('--kanban-height', height);
       };
       // Escreve no próximo frame, fora da entrega do ResizeObserver do contêiner.
