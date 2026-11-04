@@ -1,7 +1,10 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { App } from '../../app';
 import { routes } from '../../app.routes';
+import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
+import { MainLayout } from './main-layout';
 
 describe('MainLayout', () => {
   beforeEach(async () => {
@@ -83,5 +86,32 @@ describe('MainLayout', () => {
     operation.click();
     fixture.detectChanges();
     expect(operation.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('fecha o menu mobile ao escolher uma rota', async () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    try {
+      const fixture = TestBed.createComponent(App);
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/inicio');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const sidebar = fixture.debugElement.query(By.directive(MainLayout)).injector.get(HlmSidebarService);
+      sidebar.setOpenMobile(true);
+      fixture.detectChanges();
+      expect(sidebar.openMobile()).toBe(true);
+      document.querySelector<HTMLAnchorElement>('[data-mobile="true"] a[href="/produtos"]')!.click();
+      expect(sidebar.openMobile()).toBe(false);
+      await fixture.whenStable();
+      expect(router.url).toBe('/produtos');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

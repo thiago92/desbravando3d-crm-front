@@ -2,7 +2,7 @@ import { Component, DOCUMENT, effect, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible';
-import { HlmSidebarImports } from '@spartan-ng/helm/sidebar';
+import { HlmSidebarImports, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
 import { TopBar } from './top-bar/top-bar';
 
 type Theme = 'light' | 'dark';
@@ -10,6 +10,7 @@ type Theme = 'light' | 'dark';
 @Component({
   selector: 'app-main-layout',
   imports: [RouterLink, RouterLinkActive, RouterOutlet, TopBar, HlmButton, ...HlmCollapsibleImports, ...HlmSidebarImports],
+  providers: [provideHlmSidebarConfig({ closeMobileSidebarOnMenuButtonClick: true })],
   templateUrl: './main-layout.html',
 })
 export class MainLayout {

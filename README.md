@@ -135,3 +135,5 @@ npm.cmd run test:unit
 `test:unit` executa os testes uma vez, sem modo de observação. `src/app/app.spec.ts` cobre a aplicação e o redirecionamento inicial. Os testes da entrada e do layout cobrem o acesso à prévia, a navegação e a troca de tema; recuperação e redefinição de senha têm arquivos `*.spec.ts` nas respectivas pastas. O comando encontra e executa todos eles; os próximos testes ficarão junto das funcionalidades que verificam.
 
 No celular, o kanban de Encomendas ocupa pelo menos 78% da altura da janela. A página ainda pode rolar verticalmente para acessar o quadro e o conteúdo ao redor.
+
+No celular, o menu lateral fecha ao escolher uma página. Os grupos Operação e Gestão continuam expansíveis dentro do menu.
