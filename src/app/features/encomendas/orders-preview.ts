@@ -27,6 +27,13 @@ export interface OrderPreview {
   payment: 'not-defined' | 'pending' | 'received';
 }
 
+export interface NewOrderPreview {
+  customer: string;
+  items: { productId: string; sizeId: string; quantity: number; marginId: number | null }[];
+  discountPercent: number;
+  deliveryDate: string | null;
+}
+
 export type OrderMutationResult = { saved: OrderPreview } | { error: string };
 export const orderColumn = (order: OrderPreview): OrderStagePreview => order.stage;
 export const nextOrderAction: Record<OrderStagePreview, { target: OrderStagePreview; label: string } | null> = {
@@ -46,6 +53,12 @@ const deliveryIn = (days: number): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 const validHundredth = (value: number): boolean => Number.isFinite(value) && value >= 0 && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < 0.000001;
+const validDeliveryDate = (date: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T12:00:00`);
+  const normalized = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  return normalized === date;
+};
 
 const previewOrders: OrderPreview[] = [
     { id: 'order-preview-1', number: '#014', customer: 'Maria Silva', stage: 'request', items: [item('Vaso geométrico', 2, 'preview-1', 'vase-extra'), item('Organizador de mesa', 2, 'preview-3', 'organizer-standard'), item('Suporte para celular', 1, 'preview-2', 'stand-standard')], discountPercent: 0, pricingSnapshot: null, deliveryDate: null, payment: 'not-defined' },
@@ -77,6 +90,33 @@ export class OrdersPreview {
 
   sizeFor(item: OrderItemPreview): ProductSize | null {
     return item.sizeSnapshot ?? this.catalog.products().find((product) => product.id === item.productId)?.sizes.find((size) => size.id === item.sizeId) ?? null;
+  }
+
+  create(input: NewOrderPreview): OrderMutationResult {
+    const customer = input.customer.trim();
+    if (!customer) return { error: 'Informe o nome do cliente.' };
+    if (!input.items.length) return { error: 'Adicione pelo menos um produto à encomenda.' };
+    if (!validHundredth(input.discountPercent) || input.discountPercent > 100) return { error: 'Informe um desconto de 0% a 100%, com até duas casas decimais.' };
+    if (input.deliveryDate !== null && !validDeliveryDate(input.deliveryDate)) return { error: 'Informe uma data válida para a entrega.' };
+    const products = this.catalog.products();
+    const margins = readPercentages();
+    const items: OrderItemPreview[] = [];
+    for (const entry of input.items) {
+      const product = products.find((candidate) => candidate.id === entry.productId);
+      if (!product) return { error: 'Escolha um produto cadastrado para cada item.' };
+      if (!product.sizes.some((size) => size.id === entry.sizeId)) return { error: `Escolha um tamanho cadastrado para ${product.name}.` };
+      if (!Number.isSafeInteger(entry.quantity) || entry.quantity < 1) return { error: 'Informe uma quantidade inteira maior que zero para cada item.' };
+      if (!margins.some((margin) => margin.id === entry.marginId)) return { error: 'Escolha uma margem cadastrada para cada item.' };
+      items.push({ name: product.name, productId: product.id, sizeId: entry.sizeId, sizeSnapshot: null, quantity: entry.quantity, marginId: entry.marginId });
+    }
+    const nextNumber = Math.max(0, ...this.entries().map((order) => Number(order.number.replace(/^#/, '')) || 0)) + 1;
+    const saved: OrderPreview = {
+      id: crypto.randomUUID(), number: `#${String(nextNumber).padStart(3, '0')}`, customer,
+      stage: 'request', items, discountPercent: input.discountPercent, pricingSnapshot: null,
+      deliveryDate: input.deliveryDate, payment: 'not-defined',
+    };
+    this.entries.update((orders) => [...orders, saved]);
+    return { saved };
   }
 
   saveDiscount(id: string, percent: number): OrderMutationResult {

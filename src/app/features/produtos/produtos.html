@@ -62,6 +62,7 @@
                   <label class="text-xs font-medium">Largura (cm)<input hlmInput type="number" [id]="'size-width-' + i" [name]="'size-width-' + i" [(ngModel)]="size.widthCm" min="0.01" step="0.01" required class="mt-2" /></label>
                   <label class="text-xs font-medium">Profundidade (cm)<input hlmInput type="number" [id]="'size-depth-' + i" [name]="'size-depth-' + i" [(ngModel)]="size.depthCm" min="0.01" step="0.01" required class="mt-2" /></label>
                 </div>
+                <label class="mt-3 block text-xs font-medium">Peso por peça (g) · opcional<input hlmInput type="number" [id]="'size-weight-' + i" [name]="'size-weight-' + i" [(ngModel)]="size.weightGrams" min="0.01" step="0.01" class="mt-2" /></label>
                 <div class="mt-4 rounded-lg bg-muted/50 p-3">
                   <label class="block text-xs font-medium" [for]="'size-hours-' + i">Horas de impressão por unidade<input hlmInput type="number" [id]="'size-hours-' + i" [name]="'size-hours-' + i" [(ngModel)]="size.printHours" min="0.01" step="0.01" class="mt-2" /></label>
                   <p class="mt-4 text-xs font-medium">Filamentos usados por unidade</p>

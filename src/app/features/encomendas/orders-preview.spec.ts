@@ -20,6 +20,35 @@ describe('Regras de encomendas', () => {
     expect(price.total).toBe(price.subtotal);
   });
 
+  it('cria encomendas com número sequencial, itens validados e pagamento a definir', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const initialCount = service.orders().length;
+    const balanceBefore = TestBed.inject(FilamentsPreview).filaments().find((filament) => filament.id === 'filament-preview-1')!.balanceGrams;
+    const input = {
+      customer: '  Cliente Teste  ',
+      items: [
+        { productId: 'preview-1', sizeId: 'vase-small', quantity: 2, marginId: 3 },
+        { productId: 'preview-2', sizeId: 'stand-standard', quantity: 1, marginId: 3 },
+      ],
+      discountPercent: 5,
+      deliveryDate: null,
+    };
+    expect(service.create({ ...input, items: [{ ...input.items[0], sizeId: 'tamanho-inexistente' }] })).toHaveProperty('error');
+    expect(service.create({ ...input, items: [{ ...input.items[0], quantity: 0 }] })).toHaveProperty('error');
+    expect(service.create({ ...input, deliveryDate: '2026-02-30' })).toHaveProperty('error');
+    expect(service.orders()).toHaveLength(initialCount);
+    const first = service.create(input);
+    expect(first).toHaveProperty('saved');
+    if (!('saved' in first)) return;
+    expect(first.saved).toMatchObject({ number: '#016', customer: 'Cliente Teste', stage: 'request', payment: 'not-defined', discountPercent: 5, deliveryDate: null });
+    expect(first.saved.items).toHaveLength(2);
+    expect(service.priceFor(first.saved)?.items).toHaveLength(2);
+    expect(TestBed.inject(FilamentsPreview).filaments().find((filament) => filament.id === 'filament-preview-1')!.balanceGrams).toBe(balanceBefore);
+    const second = service.create({ ...input, customer: 'Outra pessoa' });
+    expect(second).toHaveProperty('saved');
+    if ('saved' in second) expect(second.saved.number).toBe('#017');
+  });
+
   it('aplica desconto apenas sobre a soma de todos os produtos', () => {
     const service = TestBed.inject(OrdersPreview);
     const id = service.orders()[0].id;

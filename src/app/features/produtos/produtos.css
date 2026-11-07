@@ -1,5 +1,4 @@
 :host { display: block; }
-button { cursor: pointer; }
 button:not([hlmBtn]) { transition: background-color 150ms ease, box-shadow 150ms ease; }
 button:not([hlmBtn]):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .product-card:hover { background: var(--accent); }

@@ -6,8 +6,7 @@
       <p class="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Acompanhe cada encomenda, do orçamento até a entrega.</p>
     </div>
     <div class="sm:text-right">
-      <button hlmBtn type="button" disabled aria-describedby="new-order-help">+ Nova encomenda</button>
-      <p id="new-order-help" class="mt-2 text-xs text-muted-foreground">Cadastro na próxima etapa.</p>
+      <button hlmBtn type="button" (click)="openCreate()">+ Nova encomenda</button>
     </div>
   </div>
   <p class="mt-4 text-xs leading-5 text-muted-foreground">Encomendas fictícias. Valores e etapas alterados nesta prévia ficam apenas durante a visita.</p>
@@ -64,6 +63,68 @@
 
   <hlm-dialog #orderDialog autoFocus="dialog" (closed)="dialogClosed()">
     <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar encomenda" class="max-h-[90dvh] w-[min(96vw,1000px)] max-w-none overflow-auto sm:max-w-none">
+      @if (creating()) {
+        <hlm-dialog-header>
+          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Nova encomenda</h2>
+          <p hlmDialogDescription class="text-sm text-muted-foreground">Cadastre o cliente e os produtos. A encomenda começará em Em orçamento.</p>
+        </hlm-dialog-header>
+        <form class="space-y-5" (ngSubmit)="saveCreate()">
+          <div><label for="create-order-customer" class="text-sm font-medium">Cliente</label><input hlmInput id="create-order-customer" name="customer" [(ngModel)]="createCustomer" required maxlength="120" class="mt-2" placeholder="Nome do cliente" /></div>
+          <section aria-labelledby="create-order-items-heading">
+            <div class="flex flex-wrap items-center justify-between gap-3"><h3 id="create-order-items-heading" class="font-semibold">Produtos da encomenda</h3><button hlmBtn variant="outline" size="sm" type="button" (click)="addCreateItem()">+ Adicionar produto</button></div>
+            <div class="mt-3 space-y-3">
+              @for (entry of createItems; track entry; let i = $index) {
+                <fieldset class="rounded-lg border border-border p-4">
+                  <legend class="px-1 text-sm font-medium">Produto {{ i + 1 }}</legend>
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label class="mb-1 block text-xs" [for]="'create-product-' + i">Produto</label>
+                      <hlm-select [value]="entry.productId || null" (valueChange)="createProductChanged(i, $event ?? '')" [itemToString]="productNameForSelect">
+                        <hlm-select-trigger class="w-full" [buttonId]="'create-product-' + i">
+                          <hlm-select-placeholder>Escolha o produto</hlm-select-placeholder>
+                          <ng-template hlmSelectValueTemplate let-value>
+                            @if (productForSelect(value); as selectedProduct) {
+                              <span class="flex min-w-0 items-center gap-2">
+                                <span class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-[8px] text-muted-foreground">
+                                  @if (productImageForSelect(selectedProduct); as image) { <img class="size-full object-cover" [src]="image" alt="" (error)="productImageFailedForSelect(selectedProduct.id)" /> } @else { Sem imagem }
+                                </span>
+                                <span class="truncate">{{ selectedProduct.name }}</span>
+                              </span>
+                            }
+                          </ng-template>
+                        </hlm-select-trigger>
+                        <hlm-select-content *hlmSelectPortal>
+                          @for (product of products(); track product.id) {
+                            <hlm-select-item [value]="product.id">
+                              <span class="flex min-w-0 items-center gap-2">
+                                <span class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[8px] text-muted-foreground">
+                                  @if (productImageForSelect(product); as image) { <img class="size-full object-cover" [src]="image" alt="" (error)="productImageFailedForSelect(product.id)" /> } @else { Sem imagem }
+                                </span>
+                                <span class="truncate">{{ product.name }}</span>
+                              </span>
+                            </hlm-select-item>
+                          }
+                        </hlm-select-content>
+                      </hlm-select>
+                    </div>
+                    <div><label class="mb-1 block text-xs" [for]="'create-size-' + i">Tamanho do produto</label><hlm-native-select class="w-full" [selectId]="'create-size-' + i" [name]="'createSize' + i" [(ngModel)]="entry.sizeId"><option hlmNativeSelectOption value="">Escolha o tamanho</option>@for (size of createSizeOptions(entry.productId); track size.id) { <option hlmNativeSelectOption [value]="size.id">{{ sizeWeight(size) }} · {{ measure(size.heightCm) }} × {{ measure(size.widthCm) }} × {{ measure(size.depthCm) }} cm</option> }</hlm-native-select></div>
+                    <div><label class="mb-1 block text-xs" [for]="'create-quantity-' + i">Quantidade</label><input hlmInput [id]="'create-quantity-' + i" [name]="'createQuantity' + i" type="number" min="1" step="1" [(ngModel)]="entry.quantity" required /></div>
+                    <div><label class="mb-1 block text-xs" [for]="'create-margin-' + i">Margem de lucro</label><hlm-native-select class="w-full" [selectId]="'create-margin-' + i" [name]="'createMargin' + i" [ngModel]="entry.marginId" (ngModelChange)="entry.marginId = +$event"><option hlmNativeSelectOption value="">Escolha a margem</option>@for (margin of margins; track margin.id) { <option hlmNativeSelectOption [value]="margin.id">{{ margin.name }} · {{ margin.percentage }}%</option> }</hlm-native-select></div>
+                  </div>
+                  <button hlmBtn variant="ghost" size="sm" type="button" class="mt-3" [attr.aria-label]="'Remover produto ' + (i + 1)" (click)="removeCreateItem(i)">Remover produto</button>
+                </fieldset>
+              } @empty { <p class="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">Adicione pelo menos um produto.</p> }
+            </div>
+          </section>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div><label for="create-order-discount" class="text-sm font-medium">Desconto (%) · opcional</label><input hlmInput id="create-order-discount" name="discount" type="number" min="0" max="100" step="0.01" [(ngModel)]="createDiscount" class="mt-2" /></div>
+            <div><label for="create-order-date" class="text-sm font-medium">Prazo para entrega · opcional</label><input hlmInput id="create-order-date" name="deliveryDate" type="date" [(ngModel)]="createDeliveryDate" class="mt-2" /></div>
+          </div>
+          <p class="text-xs text-muted-foreground">O orçamento é calculado pelos filamentos, energia e margem. O pagamento começa como “A definir”.</p>
+          @if (createError()) { <p role="alert" class="text-sm text-destructive">{{ createError() }}</p> }
+          <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="close()">Cancelar</button><button hlmBtn type="submit">Salvar encomenda</button></hlm-dialog-footer>
+        </form>
+      }
       @if (selected(); as order) {
         <hlm-dialog-header>
           <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Encomenda {{ order.number }}</h2>
@@ -92,9 +153,44 @@
                 @if (order.stage === 'request') {
                   <div class="mt-4 space-y-3 rounded-lg bg-muted/50 p-3">
                     <div class="grid gap-3 sm:grid-cols-2">
-                      <div><label class="mb-1 block text-xs" [for]="'order-size-' + itemIndex">Tamanho do produto</label><hlm-native-select class="w-full" [selectId]="'order-size-' + itemIndex" [name]="'order-size-' + itemIndex" [(ngModel)]="sizeDrafts[itemIndex]"><option hlmNativeSelectOption value="">Escolha o tamanho</option>@for (size of sizeOptions(item); track size.id) { <option hlmNativeSelectOption [value]="size.id">{{ size.name }} · {{ measure(size.heightCm) }} × {{ measure(size.widthCm) }} × {{ measure(size.depthCm) }} cm</option> }</hlm-native-select></div>
+                      <div>
+                        <label class="mb-1 block text-xs" [for]="'order-size-' + itemIndex">Tamanho do produto</label>
+                        <hlm-native-select class="w-full" [selectId]="'order-size-' + itemIndex" [name]="'order-size-' + itemIndex" [(ngModel)]="sizeDrafts[itemIndex]"><option hlmNativeSelectOption value="">Escolha o tamanho</option>@for (size of sizeOptions(item); track size.id) { <option hlmNativeSelectOption [value]="size.id">{{ sizeWeight(size) }} · {{ measure(size.heightCm) }} × {{ measure(size.widthCm) }} × {{ measure(size.depthCm) }} cm</option> }</hlm-native-select>
+                        <button hlmBtn variant="secondary" size="sm" type="button" class="mt-2" [attr.aria-expanded]="newSizeItemIndex() === itemIndex" [attr.aria-controls]="'new-order-size-' + itemIndex" (click)="startNewSize(itemIndex)">+ Novo tamanho</button>
+                      </div>
                       <div><label class="mb-1 block text-xs" [for]="'margin-' + itemIndex">Margem de lucro</label><hlm-native-select class="w-full" [selectId]="'margin-' + itemIndex" [name]="'margin-' + itemIndex" [ngModel]="marginDrafts[itemIndex]" (ngModelChange)="marginDrafts[itemIndex] = +$event"><option hlmNativeSelectOption value="">Escolha a margem</option>@for (margin of margins; track margin.id) { <option hlmNativeSelectOption [value]="margin.id">{{ margin.name }} · {{ margin.percentage }}%</option> }</hlm-native-select></div>
                     </div>
+                    @if (newSizeItemIndex() === itemIndex) {
+                      <form [id]="'new-order-size-' + itemIndex" class="space-y-3 rounded-lg border border-border bg-card p-4" (ngSubmit)="saveNewSize(itemIndex)">
+                        <h5 class="font-semibold">Novo tamanho de {{ productName(item) }}</h5>
+                        <p class="text-xs text-muted-foreground">Ao salvar, o tamanho entra no cadastro do produto e fica selecionado nesta encomenda. O orçamento continua calculado pelos custos.</p>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <label class="text-xs font-medium">Nome<input hlmInput name="newSizeName" [(ngModel)]="newSize.name" required maxlength="60" class="mt-1" /></label>
+                          <label class="text-xs font-medium">Peso por peça (g) · opcional<input hlmInput name="newSizeWeight" type="number" min="0.01" step="0.01" [(ngModel)]="newSize.weightGrams" class="mt-1" /></label>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-3">
+                          <label class="text-xs font-medium">Altura (cm)<input hlmInput name="newSizeHeight" type="number" min="0.01" step="0.01" [(ngModel)]="newSize.heightCm" required class="mt-1" /></label>
+                          <label class="text-xs font-medium">Largura (cm)<input hlmInput name="newSizeWidth" type="number" min="0.01" step="0.01" [(ngModel)]="newSize.widthCm" required class="mt-1" /></label>
+                          <label class="text-xs font-medium">Profundidade (cm)<input hlmInput name="newSizeDepth" type="number" min="0.01" step="0.01" [(ngModel)]="newSize.depthCm" required class="mt-1" /></label>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <label class="text-xs font-medium">Preço de venda no catálogo (R$)<input hlmInput name="newSizePrice" type="number" min="0.01" step="0.01" [(ngModel)]="newSize.price" required class="mt-1" /></label>
+                          <label class="text-xs font-medium">Horas de impressão por unidade<input hlmInput name="newSizeHours" type="number" min="0.01" step="0.01" [(ngModel)]="newSize.printHours" required class="mt-1" /></label>
+                        </div>
+                        <div><p class="text-xs font-medium">Filamentos por unidade</p>
+                          @for (line of newSize.materials; track line; let lineIndex = $index) {
+                            <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                              <div><label class="mb-1 block text-xs" [for]="'new-size-filament-' + lineIndex">Filamento</label><hlm-native-select class="w-full" [selectId]="'new-size-filament-' + lineIndex" [name]="'newSizeFilament' + lineIndex" [(ngModel)]="line.filamentId"><option hlmNativeSelectOption value="">Escolha o filamento</option>@for (filament of filaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></div>
+                              <label class="text-xs font-medium">Gramas/unidade<input hlmInput [id]="'new-size-grams-' + lineIndex" [name]="'newSizeGrams' + lineIndex" type="number" min="0.01" step="0.01" [(ngModel)]="line.gramsPerUnit" required class="mt-1" /></label>
+                              <button hlmBtn variant="ghost" type="button" (click)="removeNewSizeMaterial(lineIndex)" [attr.aria-label]="'Remover filamento ' + (lineIndex + 1)">Remover</button>
+                            </div>
+                          }
+                          <button hlmBtn variant="outline" size="sm" type="button" class="mt-3" (click)="addNewSizeMaterial()">Adicionar filamento</button>
+                        </div>
+                        @if (newSizeError()) { <p role="alert" class="text-sm text-destructive">{{ newSizeError() }}</p> }
+                        <div class="flex flex-wrap gap-2"><button hlmBtn size="sm" type="submit">Salvar novo tamanho</button><button hlmBtn variant="outline" size="sm" type="button" (click)="cancelNewSize()">Cancelar</button></div>
+                      </form>
+                    }
                     <button hlmBtn size="sm" type="button" (click)="saveItemSelection(itemIndex)">Salvar tamanho e margem</button>
                     <p class="text-xs text-muted-foreground">Filamentos, gramas e horas vêm do tamanho cadastrado em Produtos. O estoque considera todas as unidades na confirmação.</p>
                   </div>

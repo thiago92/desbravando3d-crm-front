@@ -3,12 +3,19 @@ import { provideSpartanHlm } from '@spartan-ng/helm/utils';
 import { Encomendas } from './encomendas';
 import { OrdersPreview } from './orders-preview';
 import { FilamentsPreview } from '../insumos/filaments-preview';
+import { ProductsPreview } from '../produtos/products-preview';
 
 describe('Encomendas: prévia do kanban', () => {
   let fixture: ComponentFixture<Encomendas>;
   let root: HTMLElement;
 
   beforeEach(async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
     localStorage.removeItem('crm-pricing-percentages-preview');
     localStorage.removeItem('crm-energy-settings-preview');
     await TestBed.configureTestingModule({ imports: [Encomendas], providers: [provideSpartanHlm()] }).compileComponents();
@@ -214,7 +221,9 @@ describe('Encomendas: prévia do kanban', () => {
     await openOrder('#013');
     const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(dialog.textContent).toContain('Vaso geométrico');
-    expect(dialog.textContent).toContain('Pequeno');
+    expect(dialog.textContent).toContain('50 g · 10 × 6 × 6 cm');
+    expect(dialog.textContent).not.toContain('Pequeno');
+    expect(dialog.querySelector<HTMLSelectElement>('#order-size-0 option[value="vase-medium"]')?.textContent).toContain('100 g · 15 × 9 × 9 cm');
     expect(dialog.textContent).toContain('4 unidades');
     expect(dialog.textContent).toContain('Prazo para entrega');
     expect(dialog.textContent).toContain('Preço por unidade');
@@ -228,6 +237,7 @@ describe('Encomendas: prévia do kanban', () => {
     [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Salvar tamanho e margem')!.click();
     fixture.detectChanges();
     await fixture.whenStable();
+    expect(dialog.textContent).toContain('100 g · 15 × 9 × 9 cm');
     await clickText('Confirmar encomenda');
     expect(root.querySelector('[data-stage="confirmed"]')?.textContent).toContain('Carlos Santos');
     expect(TestBed.inject(FilamentsPreview).filaments().find((filament) => filament.id === 'filament-preview-2')!.balanceGrams).toBe(before - 560);
@@ -238,5 +248,76 @@ describe('Encomendas: prévia do kanban', () => {
     expect(TestBed.inject(FilamentsPreview).filaments().find((filament) => filament.id === 'filament-preview-2')!.balanceGrams).toBe(before);
     await openOrder('#013');
     expect(root.querySelector('[role="dialog"] #order-size-0')).not.toBeNull();
+  });
+
+  it('cadastra um tamanho na modal e o seleciona na encomenda e no produto', async () => {
+    await openOrder('#013');
+    const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;
+    const product = TestBed.inject(ProductsPreview).products().find((entry) => entry.id === 'preview-1')!;
+    const previousCount = product.sizes.length;
+    await clickText('+ Novo tamanho');
+    expect(dialog.textContent).toContain('Novo tamanho de Vaso geométrico');
+
+    const fill = (name: string, value: string) => {
+      const input = dialog.querySelector<HTMLInputElement>(`[name="${name}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    fill('newSizeName', 'Sob medida');
+    fill('newSizeWeight', '120');
+    fill('newSizeHeight', '17');
+    fill('newSizeWidth', '10');
+    fill('newSizeDepth', '10');
+    fill('newSizePrice', '45');
+    fill('newSizeHours', '5');
+    const grams = dialog.querySelector<HTMLInputElement>('#new-size-grams-0')!;
+    grams.value = '120';
+    grams.dispatchEvent(new Event('input', { bubbles: true }));
+    const filament = dialog.querySelector<HTMLSelectElement>('#new-size-filament-0')!;
+    filament.value = 'filament-preview-1';
+    filament.dispatchEvent(new Event('change', { bubbles: true }));
+    await fixture.whenStable();
+    await clickText('Salvar novo tamanho');
+
+    const saved = TestBed.inject(ProductsPreview).products().find((entry) => entry.id === 'preview-1')!.sizes.at(-1)!;
+    expect(saved).toMatchObject({ name: 'Sob medida', weightGrams: 120, heightCm: 17, widthCm: 10, depthCm: 10, price: 45, printHours: 5, materials: [{ filamentId: 'filament-preview-1', gramsPerUnit: 120 }] });
+    expect(TestBed.inject(ProductsPreview).products().find((entry) => entry.id === 'preview-1')!.sizes).toHaveLength(previousCount + 1);
+    expect(TestBed.inject(OrdersPreview).orders().find((entry) => entry.number === '#013')!.items[0].sizeId).toBe(saved.id);
+    expect(dialog.querySelector<HTMLSelectElement>('#order-size-0')!.value).toBe(saved.id);
+    expect(dialog.textContent).toContain('120 g · 17 × 10 × 10 cm');
+  });
+
+  it('cria uma encomenda na mesma modal e abre os detalhes do orçamento', async () => {
+    await clickText('+ Nova encomenda');
+    const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog.textContent).toContain('Nova encomenda');
+    const customer = dialog.querySelector<HTMLInputElement>('#create-order-customer')!;
+    customer.value = 'Cliente Novo';
+    customer.dispatchEvent(new Event('input', { bubbles: true }));
+    const product = dialog.querySelector<HTMLButtonElement>('#create-product-0')!;
+    product.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const option = [...root.querySelectorAll<HTMLElement>('[data-slot="select-item"]')].find((item) => item.textContent?.includes('Vaso geométrico'))!;
+    expect(option.querySelector('img')?.getAttribute('src')).toBe('/products/vase.svg');
+    option.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(dialog.querySelector('#create-product-0 img')?.getAttribute('src')).toBe('/products/vase.svg');
+    const size = dialog.querySelector<HTMLSelectElement>('#create-size-0')!;
+    size.value = 'vase-small';
+    size.dispatchEvent(new Event('change', { bubbles: true }));
+    const quantity = dialog.querySelector<HTMLInputElement>('#create-quantity-0')!;
+    quantity.value = '3';
+    quantity.dispatchEvent(new Event('input', { bubbles: true }));
+    await fixture.whenStable();
+    await clickText('Salvar encomenda');
+
+    const created = TestBed.inject(OrdersPreview).orders().find((entry) => entry.customer === 'Cliente Novo')!;
+    expect(created).toMatchObject({ number: '#016', stage: 'request', payment: 'not-defined' });
+    expect(created.items[0]).toMatchObject({ productId: 'preview-1', sizeId: 'vase-small', quantity: 3 });
+    expect(root.querySelector('[data-stage="request"]')?.textContent).toContain('Cliente Novo');
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain('Encomenda #016');
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain('Pagamento a definir');
   });
 });

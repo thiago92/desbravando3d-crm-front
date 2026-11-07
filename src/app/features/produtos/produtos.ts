@@ -156,6 +156,10 @@ export class Produtos {
       return;
     }
     const validPositive = (value: number | null): boolean => value !== null && Number.isFinite(value) && value > 0 && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < 0.000001;
+    if (this.sizes.some((size) => size.weightGrams != null && !validPositive(size.weightGrams))) {
+      this.error.set('Informe um peso maior que zero, com até duas casas decimais, ou deixe o campo vazio.');
+      return;
+    }
     if (this.sizes.some((size) => !validPositive(size.printHours) || !size.materials.length || size.materials.some((line) => !this.filaments().some((filament) => filament.id === line.filamentId) || !validPositive(line.gramsPerUnit)) || new Set(size.materials.map((line) => line.filamentId)).size !== size.materials.length)) {
       this.error.set('Informe horas de impressão e pelo menos um filamento por tamanho, com gramas por unidade maiores que zero e sem repetir filamentos. Use até duas casas decimais.');
       return;

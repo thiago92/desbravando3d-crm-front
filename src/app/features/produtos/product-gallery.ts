@@ -28,7 +28,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
   styles: `
     .image-area { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 0.75rem; background: var(--muted); display: flex; align-items: center; justify-content: center; }
     .main-image { width: 100%; height: 100%; object-fit: contain; }
-    button { cursor: pointer; color: var(--foreground); }
+    button { color: var(--foreground); }
     .thumbnail:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
     .zoom-toggle { position: absolute; right: 0.75rem; bottom: 0.75rem; border-radius: 2rem; background: var(--card); }
     .placeholder, .hint { color: var(--muted-foreground); font-size: 0.75rem; }
