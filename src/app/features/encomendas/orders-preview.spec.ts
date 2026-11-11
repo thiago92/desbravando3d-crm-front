@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { FilamentsPreview } from '../insumos/filaments-preview';
+import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
 import { ProductsPreview } from '../produtos/products-preview';
 import { orderColumn, OrdersPreview } from './orders-preview';
 
@@ -136,6 +137,62 @@ describe('Regras de encomendas', () => {
     expect(service.advance(id, 'confirmed')).toHaveProperty('error');
     expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-2')?.balanceGrams).toBe(1000);
     expect(service.orders()[0].stage).toBe('request');
+  });
+
+  it('inclui argolas no preço e só baixa ambos os estoques quando há saldo suficiente', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const catalog = TestBed.inject(ProductsPreview);
+    const filaments = TestBed.inject(FilamentsPreview);
+    const supplies = TestBed.inject(UnitSuppliesPreview);
+    const saved = supplies.save('Argola para chaveiro', 0.5, { mode: 'replace', units: 1 });
+    expect(saved).toHaveProperty('saved');
+    if (!('saved' in saved)) return;
+    const product = catalog.products().find((entry) => entry.id === 'preview-1')!;
+    catalog.save({ ...product, sizes: product.sizes.map((size) => size.id === 'vase-small' ? { ...size, unitMaterials: [{ supplyId: saved.saved.id, unitsPerUnit: 1 }] } : size) }, product.id);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    const filamentBefore = filaments.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams;
+    expect(service.priceFor(order)?.items[0].unitSupplyCost).toBe(0.5);
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('error');
+    expect(filaments.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(filamentBefore);
+    expect(supplies.supplies()[0].balanceUnits).toBe(1);
+    expect(service.orders().find((entry) => entry.id === order.id)?.stage).toBe('request');
+    supplies.save(saved.saved.name, saved.saved.pricePerUnit, { mode: 'add', units: 3 }, saved.saved.id);
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('saved');
+    expect(supplies.supplies()[0].balanceUnits).toBe(0);
+    expect(filaments.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBeLessThan(filamentBefore);
+    expect(service.returnToQuote(order.id)).toHaveProperty('saved');
+    expect(supplies.supplies()[0].balanceUnits).toBe(4);
+    expect(filaments.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(filamentBefore);
+  });
+
+  it('usa o consumo real por produto na baixa sem alterar o orçamento e devolve a baixa registrada', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    const beforePrice = service.priceFor(order)!.total;
+    const beforeRed = inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams;
+    const beforeBlack = inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!.balanceGrams;
+    expect(service.saveItemConsumption(order.id, 0, [{ filamentId: 'filament-preview-1', grams: 110 }, { filamentId: 'filament-preview-2', grams: 20 }])).toHaveProperty('saved');
+    expect(service.priceFor(service.orders().find((entry) => entry.id === order.id)!)?.total).toBe(beforePrice);
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('saved');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(beforeRed - 110);
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!.balanceGrams).toBeLessThan(beforeBlack - 20);
+    expect(service.orders().find((entry) => entry.id === order.id)?.stockConsumption).toContainEqual({ filamentId: 'filament-preview-1', grams: 110 });
+    expect(service.returnToQuote(order.id)).toHaveProperty('saved');
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(beforeRed);
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!.balanceGrams).toBe(beforeBlack);
+  });
+
+  it('rejeita consumo real inválido antes de qualquer baixa', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    expect(service.saveItemConsumption(order.id, 0, [])).toHaveProperty('error');
+    expect(service.saveItemConsumption(order.id, 0, [{ filamentId: 'filament-preview-1', grams: 0 }])).toHaveProperty('error');
+    expect(service.saveItemConsumption(order.id, 0, [{ filamentId: 'filament-preview-1', grams: 1 }, { filamentId: 'filament-preview-1', grams: 2 }])).toHaveProperty('error');
+    expect(order.items[0].filamentConsumptionOverride).toBeUndefined();
+    expect(service.saveItemConsumption(order.id, 0, [{ filamentId: 'filament-preview-1', grams: 700 }])).toHaveProperty('saved');
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('error');
+    expect(TestBed.inject(FilamentsPreview).filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams).toBe(500);
   });
 
   it('valida tamanho, margem e prazo antes de alterar o pedido', () => {

@@ -65,7 +65,7 @@
     <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar encomenda" class="max-h-[90dvh] w-[min(96vw,1000px)] max-w-none overflow-auto sm:max-w-none">
       @if (creating()) {
         <hlm-dialog-header>
-          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Nova encomenda</h2>
+          <div class="flex flex-wrap items-center justify-between gap-3 pr-8"><h2 hlmDialogTitle class="text-xl font-semibold">Nova encomenda</h2><button hlmBtn variant="outline" size="sm" type="button" (click)="openCalculator()">Abrir calculadora</button></div>
           <p hlmDialogDescription class="text-sm text-muted-foreground">Cadastre o cliente e os produtos. A encomenda começará em Em orçamento.</p>
         </hlm-dialog-header>
         <form class="space-y-5" (ngSubmit)="saveCreate()">
@@ -127,7 +127,7 @@
       }
       @if (selected(); as order) {
         <hlm-dialog-header>
-          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Encomenda {{ order.number }}</h2>
+          <div class="flex flex-wrap items-center justify-between gap-3 pr-8"><h2 hlmDialogTitle class="text-xl font-semibold">Encomenda {{ order.number }}</h2><button hlmBtn variant="outline" size="sm" type="button" (click)="openCalculator()">Abrir calculadora</button></div>
           <p hlmDialogDescription class="text-sm text-muted-foreground">Consulte os itens e acompanhe a etapa da encomenda nesta prévia.</p>
         </hlm-dialog-header>
         <div>
@@ -187,20 +187,47 @@
                           }
                           <button hlmBtn variant="outline" size="sm" type="button" class="mt-3" (click)="addNewSizeMaterial()">Adicionar filamento</button>
                         </div>
+                        <div><p class="text-xs font-medium">Insumos por unidade (opcional)</p>
+                          @for (line of newSize.unitMaterials; track line; let lineIndex = $index) {
+                            <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                              <div><label class="mb-1 block text-xs" [for]="'new-size-unit-supply-' + lineIndex">Insumo</label><hlm-native-select class="w-full" [selectId]="'new-size-unit-supply-' + lineIndex" [name]="'newSizeUnitSupply' + lineIndex" [(ngModel)]="line.supplyId"><option hlmNativeSelectOption value="">Escolha o insumo</option>@for (supply of unitSupplies(); track supply.id) { <option hlmNativeSelectOption [value]="supply.id">{{ supply.name }}</option> }</hlm-native-select></div>
+                              <label class="text-xs font-medium">Unidades por peça<input hlmInput [name]="'newSizeUnitCount' + lineIndex" type="number" min="1" step="1" [(ngModel)]="line.unitsPerUnit" required class="mt-1" /></label>
+                              <button hlmBtn variant="ghost" type="button" (click)="removeNewSizeUnitMaterial(lineIndex)" [attr.aria-label]="'Remover insumo ' + (lineIndex + 1)">Remover</button>
+                            </div>
+                          }
+                          <button hlmBtn variant="outline" size="sm" type="button" class="mt-3" (click)="addNewSizeUnitMaterial()">Adicionar insumo por unidade</button>
+                        </div>
                         @if (newSizeError()) { <p role="alert" class="text-sm text-destructive">{{ newSizeError() }}</p> }
                         <div class="flex flex-wrap gap-2"><button hlmBtn size="sm" type="submit">Salvar novo tamanho</button><button hlmBtn variant="outline" size="sm" type="button" (click)="cancelNewSize()">Cancelar</button></div>
                       </form>
                     }
                     <button hlmBtn size="sm" type="button" (click)="saveItemSelection(itemIndex)">Salvar tamanho e margem</button>
-                    <p class="text-xs text-muted-foreground">Filamentos, gramas e horas vêm do tamanho cadastrado em Produtos. O estoque considera todas as unidades na confirmação.</p>
+                    <p class="text-xs text-muted-foreground">Filamentos, insumos por unidade e horas vêm do tamanho cadastrado em Produtos. O estoque considera todas as peças na confirmação.</p>
+                    <div class="border-t border-border pt-3">
+                      <div class="flex items-center gap-3"><hlm-checkbox [inputId]="'real-consumption-' + itemIndex" [name]="'realConsumption' + itemIndex" [ngModel]="consumptionDrafts[itemIndex].enabled" (ngModelChange)="setRealConsumption(itemIndex, $event)" /><label [for]="'real-consumption-' + itemIndex" class="cursor-pointer text-sm font-medium">Informar consumo real de filamento</label></div>
+                      @if (consumptionDrafts[itemIndex].enabled) {
+                        <p class="mt-2 text-xs text-muted-foreground">Informe o total usado para todas as {{ item.quantity }} peças deste produto, incluindo purga. Estes valores alteram apenas a baixa do estoque; o orçamento continua usando o consumo cadastrado por peça.</p>
+                        @for (line of consumptionDrafts[itemIndex].lines; track $index; let lineIndex = $index) {
+                          <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                            <div><label class="mb-1 block text-xs" [for]="'real-filament-' + itemIndex + '-' + lineIndex">Filamento</label><hlm-native-select class="w-full" [selectId]="'real-filament-' + itemIndex + '-' + lineIndex" [name]="'realFilament' + itemIndex + '-' + lineIndex" [(ngModel)]="line.filamentId"><option hlmNativeSelectOption value="">Escolha o filamento</option>@for (filament of filaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></div>
+                            <label class="text-xs font-medium">Total usado (g)<input hlmInput [id]="'real-grams-' + itemIndex + '-' + lineIndex" [name]="'realGrams' + itemIndex + '-' + lineIndex" type="number" min="0.01" step="0.01" [(ngModel)]="line.grams" class="mt-1" /></label>
+                            <button hlmBtn variant="ghost" type="button" (click)="removeConsumptionLine(itemIndex, lineIndex)" [attr.aria-label]="'Remover filamento real ' + (lineIndex + 1)">Remover</button>
+                          </div>
+                        }
+                        <button hlmBtn variant="outline" size="sm" type="button" class="mt-3" (click)="addConsumptionLine(itemIndex)">Adicionar filamento</button>
+                      }
+                      @if (consumptionChanged(itemIndex)) { <button hlmBtn size="sm" type="button" class="mt-3 block" (click)="saveItemConsumption(itemIndex)">Salvar consumo de estoque</button> }
+                    </div>
                   </div>
                 }
                 @if (sizeFor(item); as size) {
-                  <div class="mt-3 text-xs text-muted-foreground"><p class="font-medium">Consumo cadastrado no tamanho · {{ measure(size.printHours) }} h de impressão por unidade</p>@for (material of size.materials; track material.filamentId) { <p class="mt-1">{{ filamentName(material.filamentId) }}: {{ measure(material.gramsPerUnit) }} g por unidade · {{ measure(material.gramsPerUnit * item.quantity) }} g no total</p> }</div>
+                  <div class="mt-3 text-xs text-muted-foreground"><p class="font-medium">Consumo cadastrado no tamanho · {{ measure(size.printHours) }} h de impressão por unidade</p>@for (material of size.materials; track material.filamentId) { <p class="mt-1">{{ filamentName(material.filamentId) }}: {{ measure(material.gramsPerUnit) }} g por unidade · {{ measure(material.gramsPerUnit * item.quantity) }} g no total</p> }@for (material of size.unitMaterials ?? []; track material.supplyId) { <p class="mt-1">{{ unitSupplyName(material.supplyId) }}: {{ material.unitsPerUnit }} por peça · {{ material.unitsPerUnit * item.quantity }} no total</p> }</div>
                 } @else { <p class="mt-2 text-xs text-muted-foreground">Tamanho não disponível no catálogo.</p> }
+                @if (item.filamentConsumptionOverride; as realLines) { <div class="mt-3 rounded-lg border border-border p-3 text-xs"><p class="font-medium">Consumo de filamento para baixa no estoque</p>@for (line of realLines; track line.filamentId) { <p class="mt-1">{{ filamentName(line.filamentId) }}: {{ measure(line.grams) }} g no total</p> }</div> }
                 @if (selectedPrice()?.items?.[itemIndex]; as itemPrice) {
                   <dl class="mt-3 grid gap-x-5 gap-y-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                     <div><dt class="text-muted-foreground">Filamento por peça</dt><dd class="font-medium">{{ measure(itemPrice.gramsPerUnit) }} g · média {{ money(itemPrice.weightedPricePerKg) }}/kg</dd></div>
+                    @if (itemPrice.unitSupplyCost > 0) { <div><dt class="text-muted-foreground">Insumos por unidade/peça</dt><dd class="font-medium">{{ money(itemPrice.unitSupplyCost) }}</dd></div> }
                     <div><dt class="text-muted-foreground">Custo do material</dt><dd class="font-medium">{{ money(itemPrice.materialCost) }}</dd></div>
                     <div><dt class="text-muted-foreground">Custo da energia</dt><dd class="font-medium">{{ money(itemPrice.energyCost) }}</dd></div>
                     <div><dt class="text-muted-foreground">Margem aplicada</dt><dd class="font-medium">{{ itemPrice.marginName }} · {{ itemPrice.markupPercent }}%</dd></div>
@@ -247,6 +274,16 @@
           @if (action(); as next) { <button hlmBtn type="button" [disabled]="advancing() || (order.stage === 'request' && !selectedPrice())" (click)="advance()">{{ next.label }}</button> }
         </hlm-dialog-footer>
       }
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <hlm-dialog #calculatorDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar calculadora" class="max-h-[90dvh] w-[min(96vw,900px)] max-w-none overflow-auto sm:max-w-none">
+      <hlm-dialog-header>
+        <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Calculadora de impressão 3D</h2>
+        <p hlmDialogDescription class="text-sm text-muted-foreground">Simulação independente dos dados desta encomenda.</p>
+      </hlm-dialog-header>
+      <app-print-calculator [embedded]="true" />
     </hlm-dialog-content>
   </hlm-dialog>
 </section>

@@ -10,6 +10,7 @@ export interface ProductSize {
   price: number;
   printHours: number;
   materials: { filamentId: string; gramsPerUnit: number }[];
+  unitMaterials?: { supplyId: string; unitsPerUnit: number }[];
 }
 
 export interface ProductPreview {

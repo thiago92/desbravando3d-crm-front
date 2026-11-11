@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { latestEnergySetting, readPercentages } from '../calculadora/pricing-settings-preview';
 import { FilamentsPreview } from '../insumos/filaments-preview';
+import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
 import { ProductsPreview, type ProductSize } from '../produtos/products-preview';
 import { calculateOrderPrice, type OrderPrice } from './order-pricing';
 
@@ -13,6 +14,7 @@ export interface OrderItemPreview {
   sizeSnapshot: ProductSize | null;
   quantity: number;
   marginId: number | null;
+  filamentConsumptionOverride?: { filamentId: string; grams: number }[] | null;
 }
 export interface OrderPreview {
   id: string;
@@ -23,6 +25,7 @@ export interface OrderPreview {
   discountPercent: number;
   pricingSnapshot: OrderPrice | null;
   stockConsumption?: { filamentId: string; grams: number }[];
+  unitStockConsumption?: { supplyId: string; units: number }[];
   deliveryDate: string | null;
   payment: 'not-defined' | 'pending' | 'received';
 }
@@ -76,16 +79,17 @@ const previewOrders: OrderPreview[] = [
 @Injectable({ providedIn: 'root' })
 export class OrdersPreview {
   private readonly inventory = inject(FilamentsPreview);
+  private readonly unitInventory = inject(UnitSuppliesPreview);
   private readonly catalog = inject(ProductsPreview);
   private readonly entries = signal<readonly OrderPreview[]>(previewOrders.map((order) => order.stage === 'request' ? order : {
     ...order,
     items: order.items.map((entry) => ({ ...entry, sizeSnapshot: this.copySize(this.catalog.products().find((product) => product.id === entry.productId)?.sizes.find((size) => size.id === entry.sizeId) ?? null) })),
-    pricingSnapshot: calculateOrderPrice(order, this.catalog.products(), this.inventory.filaments(), latestEnergySetting(), readPercentages()),
+    pricingSnapshot: calculateOrderPrice(order, this.catalog.products(), this.inventory.filaments(), latestEnergySetting(), readPercentages(), this.unitInventory.supplies()),
   }));
   readonly orders = this.entries.asReadonly();
 
   priceFor(order: OrderPreview): OrderPrice | null {
-    return order.pricingSnapshot ?? calculateOrderPrice(order, this.catalog.products(), this.inventory.filaments(), latestEnergySetting(), readPercentages());
+    return order.pricingSnapshot ?? calculateOrderPrice(order, this.catalog.products(), this.inventory.filaments(), latestEnergySetting(), readPercentages(), this.unitInventory.supplies());
   }
 
   sizeFor(item: OrderItemPreview): ProductSize | null {
@@ -143,7 +147,19 @@ export class OrdersPreview {
     const product = this.catalog.products().find((entry) => entry.id === order.items[index].productId);
     if (!product?.sizes.some((size) => size.id === sizeId)) return { error: 'Escolha um tamanho cadastrado para o produto.' };
     if (!readPercentages().some((entry) => entry.id === marginId)) return { error: 'Escolha uma margem cadastrada em Precificação.' };
-    const items = order.items.map((entry, position) => position === index ? { ...entry, sizeId, marginId } : entry);
+    const items = order.items.map((entry, position) => position === index ? { ...entry, sizeId, marginId, filamentConsumptionOverride: sizeId === entry.sizeId ? entry.filamentConsumptionOverride : null } : entry);
+    return this.update({ ...order, items });
+  }
+
+  saveItemConsumption(id: string, index: number, lines: { filamentId: string; grams: number }[] | null): OrderMutationResult {
+    const order = this.entries().find((entry) => entry.id === id);
+    if (!order || order.stage !== 'request' || !order.items[index]) return { error: 'O consumo de estoque só pode ser alterado antes da confirmação.' };
+    if (lines !== null) {
+      if (!lines.length || lines.some((line) => !this.inventory.filaments().some((filament) => filament.id === line.filamentId) || !validHundredth(line.grams) || line.grams <= 0) || new Set(lines.map((line) => line.filamentId)).size !== lines.length) {
+        return { error: 'Informe pelo menos um filamento cadastrado, com gramas positivas e até duas casas decimais, sem repetições.' };
+      }
+    }
+    const items = order.items.map((entry, position) => position === index ? { ...entry, filamentConsumptionOverride: lines?.map((line) => ({ ...line })) ?? null } : entry);
     return this.update({ ...order, items });
   }
 
@@ -154,12 +170,29 @@ export class OrdersPreview {
       const price = this.priceFor(order);
       if (!price) return { error: 'Complete a precificação dos produtos e cadastre energia e margens antes de confirmar.' };
       const requirements = new Map<string, number>();
-      for (const entry of order.items) for (const line of this.sizeFor(entry)?.materials ?? []) {
-        requirements.set(line.filamentId, (requirements.get(line.filamentId) ?? 0) + line.gramsPerUnit * entry.quantity);
+      const unitRequirements = new Map<string, number>();
+      for (const entry of order.items) {
+        const size = this.sizeFor(entry);
+        for (const line of entry.filamentConsumptionOverride ?? size?.materials ?? []) {
+          const grams = 'grams' in line ? line.grams : line.gramsPerUnit * entry.quantity;
+          requirements.set(line.filamentId, (requirements.get(line.filamentId) ?? 0) + grams);
+        }
+        for (const line of size?.unitMaterials ?? []) {
+          unitRequirements.set(line.supplyId, (unitRequirements.get(line.supplyId) ?? 0) + line.unitsPerUnit * entry.quantity);
+        }
       }
+      const filamentValidation = this.inventory.validateConsumption(requirements);
+      if ('error' in filamentValidation) return filamentValidation;
+      const unitValidation = this.unitInventory.validateConsumption(unitRequirements);
+      if ('error' in unitValidation) return unitValidation;
       const result = this.inventory.consume(requirements);
       if ('error' in result) return result;
-      return this.update({ ...order, stage: target, pricingSnapshot: price, stockConsumption: [...requirements].map(([filamentId, grams]) => ({ filamentId, grams })), items: order.items.map((entry) => ({ ...entry, sizeSnapshot: this.copySize(this.sizeFor(entry)) })) });
+      const unitResult = this.unitInventory.consume(unitRequirements);
+      if ('error' in unitResult) {
+        this.inventory.restore(requirements);
+        return unitResult;
+      }
+      return this.update({ ...order, stage: target, pricingSnapshot: price, stockConsumption: [...requirements].map(([filamentId, grams]) => ({ filamentId, grams })), unitStockConsumption: [...unitRequirements].map(([supplyId, units]) => ({ supplyId, units })), items: order.items.map((entry) => ({ ...entry, sizeSnapshot: this.copySize(this.sizeFor(entry)) })) });
     }
     return this.update({ ...order, stage: target });
   }
@@ -172,7 +205,11 @@ export class OrdersPreview {
       const result = this.inventory.restore(new Map(order.stockConsumption.map(({ filamentId, grams }) => [filamentId, grams])));
       if ('error' in result) return result;
     }
-    return this.update({ ...order, stage: 'request', pricingSnapshot: null, stockConsumption: undefined, items: order.items.map((entry) => ({ ...entry, sizeSnapshot: null })) });
+    if (order.unitStockConsumption?.length) {
+      const result = this.unitInventory.restore(new Map(order.unitStockConsumption.map(({ supplyId, units }) => [supplyId, units])));
+      if ('error' in result) return result;
+    }
+    return this.update({ ...order, stage: 'request', pricingSnapshot: null, stockConsumption: undefined, unitStockConsumption: undefined, items: order.items.map((entry) => ({ ...entry, sizeSnapshot: null })) });
   }
 
   private update(saved: OrderPreview): OrderMutationResult {
@@ -181,6 +218,6 @@ export class OrdersPreview {
   }
 
   private copySize(size: ProductSize | null): ProductSize | null {
-    return size ? { ...size, materials: size.materials.map((line) => ({ ...line })) } : null;
+    return size ? { ...size, materials: size.materials.map((line) => ({ ...line })), unitMaterials: size.unitMaterials?.map((line) => ({ ...line })) } : null;
   }
 }

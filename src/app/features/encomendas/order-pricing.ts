@@ -1,12 +1,14 @@
 import { calculatePrintPrice } from '../calculadora/print-calculator/print-calculation';
 import type { EnergySetting, PricingPercentage } from '../calculadora/pricing-settings-preview';
 import type { FilamentPreview } from '../insumos/filaments-preview';
+import type { UnitSupplyPreview } from '../insumos/unit-supplies-preview';
 import type { ProductPreview, ProductSize } from '../produtos/products-preview';
 import type { OrderItemPreview, OrderPreview } from './orders-preview';
 
 export interface ItemPrice {
   gramsPerUnit: number;
   weightedPricePerKg: number;
+  unitSupplyCost: number;
   materialCost: number;
   energyCost: number;
   directCost: number;
@@ -28,7 +30,7 @@ export interface OrderPrice {
 
 const cents = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
-export function calculateItemPrice(item: OrderItemPreview, size: ProductSize, filaments: FilamentPreview[], energy: EnergySetting, margin: PricingPercentage): ItemPrice | null {
+export function calculateItemPrice(item: OrderItemPreview, size: ProductSize, filaments: FilamentPreview[], energy: EnergySetting, margin: PricingPercentage, unitSupplies: UnitSupplyPreview[] = []): ItemPrice | null {
   if (!size.materials.length || !Number.isFinite(size.printHours) || size.printHours <= 0 || !Number.isSafeInteger(item.quantity) || item.quantity <= 0) return null;
   let gramsPerUnit = 0;
   let materialCost = 0;
@@ -38,6 +40,12 @@ export function calculateItemPrice(item: OrderItemPreview, size: ProductSize, fi
     gramsPerUnit += material.gramsPerUnit;
     materialCost += material.gramsPerUnit * filament.pricePerKg / 1000;
   }
+  let unitSupplyCost = 0;
+  for (const material of size.unitMaterials ?? []) {
+    const supply = unitSupplies.find((entry) => entry.id === material.supplyId);
+    if (!supply || !Number.isSafeInteger(material.unitsPerUnit) || material.unitsPerUnit <= 0) return null;
+    unitSupplyCost += material.unitsPerUnit * supply.pricePerUnit;
+  }
   const weightedPricePerKg = materialCost * 1000 / gramsPerUnit;
   const calculation = calculatePrintPrice({
     filamentPricePerKg: weightedPricePerKg,
@@ -46,19 +54,20 @@ export function calculateItemPrice(item: OrderItemPreview, size: ProductSize, fi
     averagePowerW: energy.averagePowerW,
     tariffPerKwh: energy.tariffPerKwh,
     markupPercent: margin.percentage,
+    additionalMaterialCost: unitSupplyCost,
   });
   if (!calculation) return null;
   const unitPrice = cents(calculation.suggestedPrice);
-  return { gramsPerUnit, weightedPricePerKg, materialCost: calculation.materialCost, energyCost: calculation.energyCost, directCost: calculation.directCost, unitPrice, lineTotal: cents(unitPrice * item.quantity), marginName: margin.name, markupPercent: margin.percentage };
+  return { gramsPerUnit, weightedPricePerKg, unitSupplyCost, materialCost: calculation.materialCost, energyCost: calculation.energyCost, directCost: calculation.directCost, unitPrice, lineTotal: cents(unitPrice * item.quantity), marginName: margin.name, markupPercent: margin.percentage };
 }
 
-export function calculateOrderPrice(order: OrderPreview, products: ProductPreview[], filaments: FilamentPreview[], energy: EnergySetting | null, margins: PricingPercentage[]): OrderPrice | null {
+export function calculateOrderPrice(order: OrderPreview, products: ProductPreview[], filaments: FilamentPreview[], energy: EnergySetting | null, margins: PricingPercentage[], unitSupplies: UnitSupplyPreview[] = []): OrderPrice | null {
   if (!energy || !Number.isFinite(order.discountPercent) || order.discountPercent < 0 || order.discountPercent > 100) return null;
   const items: ItemPrice[] = [];
   for (const item of order.items) {
     const size = item.sizeSnapshot ?? products.find((product) => product.id === item.productId)?.sizes.find((entry) => entry.id === item.sizeId);
     const margin = margins.find((entry) => entry.id === item.marginId);
-    const price = margin && size ? calculateItemPrice(item, size, filaments, energy, margin) : null;
+    const price = margin && size ? calculateItemPrice(item, size, filaments, energy, margin, unitSupplies) : null;
     if (!price) return null;
     items.push(price);
   }

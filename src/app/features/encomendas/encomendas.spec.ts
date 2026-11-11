@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { provideSpartanHlm } from '@spartan-ng/helm/utils';
 import { Encomendas } from './encomendas';
 import { OrdersPreview } from './orders-preview';
@@ -18,6 +19,7 @@ describe('Encomendas: prévia do kanban', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
     localStorage.removeItem('crm-pricing-percentages-preview');
     localStorage.removeItem('crm-energy-settings-preview');
+    localStorage.removeItem('crm-print-calculator-preview');
     await TestBed.configureTestingModule({ imports: [Encomendas], providers: [provideSpartanHlm()] }).compileComponents();
     fixture = TestBed.createComponent(Encomendas);
     document.body.append(fixture.nativeElement);
@@ -45,10 +47,10 @@ describe('Encomendas: prévia do kanban', () => {
     const board = root.querySelector<HTMLElement>('.kanban-board')!;
     const rect = vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({ top: 450 } as DOMRect);
     window.dispatchEvent(new Event('resize'));
-    expect(parseFloat(board.style.getPropertyValue('--kanban-height'))).toBe(Math.max(220, window.innerHeight - 450 - window.scrollY - 32));
-    rect.mockReturnValue({ top: 350 } as DOMRect);
+    expect(parseFloat(board.style.getPropertyValue('--kanban-height'))).toBe(Math.max(480, window.innerHeight - 450 - window.scrollY - 32));
+    rect.mockReturnValue({ top: 150 } as DOMRect);
     window.dispatchEvent(new Event('resize'));
-    expect(parseFloat(board.style.getPropertyValue('--kanban-height'))).toBe(Math.max(220, window.innerHeight - 350 - window.scrollY - 32));
+    expect(parseFloat(board.style.getPropertyValue('--kanban-height'))).toBe(Math.max(480, window.innerHeight - 150 - window.scrollY - 32));
     rect.mockRestore();
   });
 
@@ -76,6 +78,50 @@ describe('Encomendas: prévia do kanban', () => {
     fixture.detectChanges();
     await fixture.whenStable();
   }
+
+  it('mostra campos de consumo real somente ao marcar cada produto e mantém o preço', async () => {
+    await openOrder('#013');
+    const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;
+    const price = TestBed.inject(OrdersPreview).priceFor(TestBed.inject(OrdersPreview).orders().find((order) => order.number === '#013')!)!.total;
+    expect(dialog.querySelector('#real-grams-0-0')).toBeNull();
+    dialog.querySelector<HTMLElement>('#real-consumption-0')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(dialog.textContent).toContain('Informe o total usado');
+    expect(dialog.querySelector<HTMLInputElement>('#real-grams-0-0')?.value).toBe('200');
+    const grams = dialog.querySelector<HTMLInputElement>('#real-grams-0-0')!;
+    grams.value = '110';
+    grams.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await clickText('Salvar consumo de estoque');
+    const updated = TestBed.inject(OrdersPreview).orders().find((order) => order.number === '#013')!;
+    expect(updated.items[0].filamentConsumptionOverride).toEqual([{ filamentId: 'filament-preview-1', grams: 110 }]);
+    expect(TestBed.inject(OrdersPreview).priceFor(updated)?.total).toBe(price);
+  });
+
+  it('abre a calculadora sobre os detalhes e volta à encomenda com os valores preservados', async () => {
+    await openOrder('#014');
+    await clickText('Abrir calculadora');
+    let dialogs = root.querySelectorAll<HTMLElement>('[role="dialog"]');
+    expect(dialogs).toHaveLength(2);
+    expect(dialogs[0].textContent).toContain('Encomenda #014');
+    expect(dialogs[1].textContent).toContain('Calculadora de impressão 3D');
+
+    const input = dialogs[1].querySelector<HTMLInputElement>('#calc-filament-price')!;
+    input.value = '120';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    dialogs[1].querySelector<HTMLButtonElement>('button[hlmdialogclose]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain('Encomenda #014');
+
+    await clickText('Abrir calculadora');
+    dialogs = root.querySelectorAll<HTMLElement>('[role="dialog"]');
+    expect(dialogs[1].querySelector<HTMLInputElement>('#calc-filament-price')?.value).toBe('120');
+  });
 
   it('aplica desconto no total sem mudar a etapa nem os preços dos produtos', async () => {
     await openOrder('#014');
@@ -319,5 +365,16 @@ describe('Encomendas: prévia do kanban', () => {
     expect(root.querySelector('[data-stage="request"]')?.textContent).toContain('Cliente Novo');
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain('Encomenda #016');
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain('Pagamento a definir');
+  });
+});
+
+describe('Encomendas: acesso por Clientes e lojas', () => {
+  it('abre diretamente a modal do registro indicado', async () => {
+    await TestBed.configureTestingModule({ imports: [Encomendas], providers: [provideSpartanHlm(), { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ abrir: 'order-preview-1' }) } } }] }).compileComponents();
+    const fixture = TestBed.createComponent(Encomendas);
+    document.body.append(fixture.nativeElement);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.querySelector<HTMLElement>('[role="dialog"]')?.textContent).toContain('Encomenda #014');
   });
 });

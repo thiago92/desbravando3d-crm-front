@@ -1,17 +1,21 @@
 import { Component, DestroyRef, ElementRef, ViewChild, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmCard } from '@spartan-ng/helm/card';
 import { HlmDialog, HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { readPercentages } from '../calculadora/pricing-settings-preview';
+import { PrintCalculator } from '../calculadora/print-calculator/print-calculator';
 import { FilamentsPreview } from '../insumos/filaments-preview';
+import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
 import { ProductPreview, ProductSize, ProductsPreview } from '../produtos/products-preview';
 import { formatMeasure, formatMoney, normalizeSearch } from '../../shared/utils/presentation';
 import { NewOrderPreview, OrderItemPreview, OrderPreview, OrdersPreview, nextOrderAction, orderColumn } from './orders-preview';
-import { HorizontalDragScroll } from './directives/horizontal-drag-scroll';
+import { HorizontalDragScroll } from '../../shared/directives/horizontal-drag-scroll';
 
 const stages: { id: OrderPreview['stage']; label: string }[] = [
   { id: 'request', label: 'Em orçamento' },
@@ -30,20 +34,25 @@ type SizeDraft = {
   price: number | null;
   printHours: number | null;
   materials: { filamentId: string; gramsPerUnit: number | null }[];
+  unitMaterials: { supplyId: string; unitsPerUnit: number | null }[];
 };
+type ConsumptionDraft = { enabled: boolean; lines: { filamentId: string; grams: number | null }[] };
 
 @Component({
   selector: 'app-encomendas',
-  imports: [FormsModule, HlmButton, HlmCard, HlmInput, HorizontalDragScroll, ...HlmDialogImports, ...HlmNativeSelectImports, ...HlmSelectImports],
+  imports: [FormsModule, HlmButton, HlmCheckbox, HlmCard, HlmInput, HorizontalDragScroll, PrintCalculator, ...HlmDialogImports, ...HlmNativeSelectImports, ...HlmSelectImports],
   templateUrl: './encomendas.html',
   styleUrl: './encomendas.css',
 })
 export class Encomendas {
   @ViewChild('orderDialog') private dialog?: HlmDialog;
+  @ViewChild('calculatorDialog') private calculatorDialog?: HlmDialog;
   @ViewChild('board') private board?: ElementRef<HTMLElement>;
   private readonly preview = inject(OrdersPreview);
+  private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly catalog = inject(ProductsPreview);
   private readonly inventory = inject(FilamentsPreview);
+  private readonly unitInventory = inject(UnitSuppliesPreview);
   protected readonly margins = readPercentages();
   protected readonly query = signal('');
   protected readonly creating = signal(false);
@@ -66,10 +75,12 @@ export class Encomendas {
   protected deliveryDateValue = '';
   protected sizeDrafts: string[] = [];
   protected marginDrafts: (number | null)[] = [];
+  protected consumptionDrafts: ConsumptionDraft[] = [];
   protected readonly newSizeItemIndex = signal<number | null>(null);
   protected newSize: SizeDraft = this.emptySize();
   protected readonly newSizeError = signal('');
   protected readonly filaments = this.inventory.filaments;
+  protected readonly unitSupplies = this.unitInventory.supplies;
   protected readonly filteredOrders = computed(() => {
     const term = normalizeSearch(this.query().trim());
     return this.preview.orders().filter((order) => normalizeSearch(`${order.number} ${order.customer}`).includes(term));
@@ -98,7 +109,7 @@ export class Encomendas {
       const fitBoard = () => {
         // Desconta a posição real do quadro, inclusive filtros/avisos e quebras de linha.
         const top = board.getBoundingClientRect().top + window.scrollY;
-        const minimum = window.innerWidth < 640 ? Math.max(220, Math.floor(window.innerHeight * 0.78)) : 220;
+        const minimum = window.innerWidth < 640 ? Math.max(220, Math.floor(window.innerHeight * 0.78)) : 480;
         const height = `${Math.max(minimum, Math.floor(window.innerHeight - top - 32))}px`;
         if (board.style.getPropertyValue('--kanban-height') !== height) board.style.setProperty('--kanban-height', height);
       };
@@ -110,6 +121,9 @@ export class Encomendas {
       observer?.observe(board.parentElement!);
       window.addEventListener('resize', fitBoard);
       fitBoard();
+      const requestedId = this.route?.snapshot.queryParamMap.get('abrir');
+      const requestedOrder = this.preview.orders().find((order) => order.id === requestedId);
+      if (requestedOrder) this.open(requestedOrder);
       destroyRef.onDestroy(() => {
         observer?.disconnect();
         cancelAnimationFrame(resizeFrame);
@@ -211,6 +225,7 @@ export class Encomendas {
     this.deliveryDateValue = order.deliveryDate ?? '';
     this.sizeDrafts = order.items.map((item) => item.sizeId);
     this.marginDrafts = order.items.map((item) => item.marginId);
+    this.consumptionDrafts = order.items.map((item) => this.consumptionDraft(item));
     this.createError.set('');
     this.creating.set(false);
     this.notice.set(`Encomenda ${order.number} criada em Em orçamento.`);
@@ -218,8 +233,43 @@ export class Encomendas {
 
   protected sizeFor(item: OrderItemPreview) { return this.preview.sizeFor(item); }
 
+  private consumptionDraft(item: OrderItemPreview): ConsumptionDraft {
+    const lines = item.filamentConsumptionOverride ?? this.preview.sizeFor(item)?.materials.map((line) => ({ filamentId: line.filamentId, grams: line.gramsPerUnit * item.quantity })) ?? [];
+    return { enabled: item.filamentConsumptionOverride !== null && item.filamentConsumptionOverride !== undefined, lines: lines.map((line) => ({ ...line })) };
+  }
+
+  protected setRealConsumption(index: number, enabled: boolean): void {
+    const item = this.selected()?.items[index];
+    if (!item) return;
+    this.consumptionDrafts[index] = { enabled, lines: enabled ? this.consumptionDraft(item).lines : [] };
+    this.error.set('');
+  }
+
+  protected addConsumptionLine(index: number): void { this.consumptionDrafts[index].lines.push({ filamentId: '', grams: null }); }
+  protected removeConsumptionLine(index: number, lineIndex: number): void { this.consumptionDrafts[index].lines.splice(lineIndex, 1); }
+
+  protected saveItemConsumption(index: number): void {
+    const order = this.selected();
+    const draft = this.consumptionDrafts[index];
+    if (!order || !draft) return;
+    const result = this.preview.saveItemConsumption(order.id, index, draft.enabled ? draft.lines.map((line) => ({ filamentId: line.filamentId, grams: line.grams! })) : null);
+    if ('error' in result) { this.error.set(result.error); return; }
+    this.consumptionDrafts[index] = this.consumptionDraft(result.saved.items[index]);
+    this.error.set('');
+    this.notice.set(`Consumo de estoque de ${this.productName(order.items[index])} atualizado.`);
+  }
+
+  protected consumptionChanged(index: number): boolean {
+    const item = this.selected()?.items[index];
+    const draft = this.consumptionDrafts[index];
+    if (!item || !draft) return false;
+    if (!draft.enabled) return item.filamentConsumptionOverride != null;
+    const saved = item.filamentConsumptionOverride;
+    return !saved || saved.length !== draft.lines.length || saved.some((line, lineIndex) => line.filamentId !== draft.lines[lineIndex].filamentId || line.grams !== draft.lines[lineIndex].grams);
+  }
+
   private emptySize(): SizeDraft {
-    return { name: '', weightGrams: null, heightCm: null, widthCm: null, depthCm: null, price: null, printHours: null, materials: [{ filamentId: '', gramsPerUnit: null }] };
+    return { name: '', weightGrams: null, heightCm: null, widthCm: null, depthCm: null, price: null, printHours: null, materials: [{ filamentId: '', gramsPerUnit: null }], unitMaterials: [] };
   }
 
   protected startNewSize(index: number): void {
@@ -241,6 +291,14 @@ export class Encomendas {
     this.newSize.materials.splice(index, 1);
   }
 
+  protected addNewSizeUnitMaterial(): void {
+    this.newSize.unitMaterials.push({ supplyId: '', unitsPerUnit: null });
+  }
+
+  protected removeNewSizeUnitMaterial(index: number): void {
+    this.newSize.unitMaterials.splice(index, 1);
+  }
+
   protected saveNewSize(index: number): void {
     const order = this.selected();
     const item = order?.items[index];
@@ -260,11 +318,16 @@ export class Encomendas {
       this.newSizeError.set('Informe pelo menos um filamento cadastrado, com gramas positivas por unidade e sem repetições.');
       return;
     }
+    if (draft.unitMaterials.some((line) => !this.unitSupplies().some((supply) => supply.id === line.supplyId) || !Number.isSafeInteger(line.unitsPerUnit) || line.unitsPerUnit! <= 0) || new Set(draft.unitMaterials.map((line) => line.supplyId)).size !== draft.unitMaterials.length) {
+      this.newSizeError.set('Informe insumos por unidade cadastrados, com quantidades inteiras positivas e sem repetições.');
+      return;
+    }
     const size: ProductSize = {
       id: crypto.randomUUID(), name: draft.name.trim(), weightGrams: draft.weightGrams,
       heightCm: draft.heightCm!, widthCm: draft.widthCm!, depthCm: draft.depthCm!,
       price: draft.price!, printHours: draft.printHours!,
       materials: draft.materials.map((line) => ({ filamentId: line.filamentId, gramsPerUnit: line.gramsPerUnit! })),
+      unitMaterials: draft.unitMaterials.map((line) => ({ supplyId: line.supplyId, unitsPerUnit: line.unitsPerUnit! })),
     };
     this.catalog.save({ ...product, sizes: [...product.sizes, size] }, product.id);
     this.sizeDrafts[index] = size.id;
@@ -273,6 +336,7 @@ export class Encomendas {
       this.newSizeError.set(result.error);
       return;
     }
+    this.consumptionDrafts[index] = this.consumptionDraft(result.saved.items[index]);
     this.cancelNewSize();
     this.error.set('');
     this.notice.set(`Novo tamanho de ${product.name} cadastrado e selecionado nesta encomenda.`);
@@ -287,6 +351,10 @@ export class Encomendas {
     return filament ? `${filament.material} ${filament.color}` : 'Filamento indisponível';
   }
 
+  protected unitSupplyName(id: string): string {
+    return this.unitSupplies().find((entry) => entry.id === id)?.name ?? 'Insumo indisponível';
+  }
+
   protected paymentLabel(order: OrderPreview): string {
     return { 'not-defined': 'Pagamento a definir', pending: 'Pagamento pendente', received: 'Pagamento recebido' }[order.payment];
   }
@@ -298,6 +366,7 @@ export class Encomendas {
     this.deliveryDateValue = order.deliveryDate ?? '';
     this.sizeDrafts = order.items.map((item) => item.sizeId);
     this.marginDrafts = order.items.map((item) => item.marginId);
+    this.consumptionDrafts = order.items.map((item) => this.consumptionDraft(item));
     this.cancelNewSize();
     this.error.set('');
     this.notice.set('');
@@ -328,6 +397,7 @@ export class Encomendas {
     if (!order) return;
     const result = this.preview.saveItemSelection(order.id, index, this.sizeDrafts[index], this.marginDrafts[index]);
     if ('error' in result) { this.error.set(result.error); return; }
+    this.consumptionDrafts[index] = this.consumptionDraft(result.saved.items[index]);
     this.error.set('');
     this.notice.set(`Tamanho e margem de ${this.productName(order.items[index])} atualizados.`);
   }
@@ -342,6 +412,10 @@ export class Encomendas {
     }
     if (order.stage === 'request' && (this.deliveryDateValue !== (order.deliveryDate ?? '') || order.items.some((item, index) => this.sizeDrafts[index] !== item.sizeId || this.marginDrafts[index] !== item.marginId))) {
       this.error.set('Salve o prazo, o tamanho e a margem alterados antes de confirmar a encomenda.');
+      return;
+    }
+    if (order.stage === 'request' && order.items.some((_, index) => this.consumptionChanged(index))) {
+      this.error.set('Salve o consumo real de cada produto antes de confirmar a encomenda.');
       return;
     }
     const result = this.preview.advance(order.id, action.target);
@@ -364,6 +438,8 @@ export class Encomendas {
   }
 
   protected close(): void { this.dialog?.close(); }
+
+  protected openCalculator(): void { this.calculatorDialog?.open(); }
 
   protected dialogClosed(): void {
     this.cancelNewSize();

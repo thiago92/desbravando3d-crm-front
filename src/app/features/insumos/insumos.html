@@ -3,14 +3,14 @@
   <div class="mt-3 flex flex-wrap items-center justify-between gap-4">
     <div>
       <h1 class="text-3xl font-semibold tracking-tight">Insumos</h1>
-      <p class="mt-3 text-sm leading-6 text-muted-foreground">Cadastre seus filamentos e acompanhe o saldo disponível em gramas.</p>
+      <p class="mt-3 text-sm leading-6 text-muted-foreground">Acompanhe filamentos em gramas e outros insumos em unidades.</p>
     </div>
-    <button hlmBtn type="button" (click)="open()">+ Cadastrar filamento</button>
+    <div class="flex flex-wrap gap-2"><button hlmBtn type="button" (click)="open()">+ Cadastrar filamento</button><button hlmBtn variant="outline" type="button" (click)="openUnit()">+ Cadastrar insumo por unidade</button></div>
   </div>
   <p class="mt-4 text-xs leading-5 text-muted-foreground">Estoque de exemplo. As alterações ficam apenas nesta visita e são reiniciadas ao recarregar a página.</p>
 
   <div class="mt-8 rounded-2xl border border-border bg-card p-5">
-    <label for="filament-search" class="text-sm font-medium">Buscar filamento</label>
+    <label for="filament-search" class="text-sm font-medium">Buscar insumo</label>
     <input hlmInput id="filament-search" type="search" class="mt-2 sm:max-w-md" placeholder="Nome, material ou cor" [ngModel]="query()" (ngModelChange)="query.set($event)" />
     <p class="mt-3 text-xs text-muted-foreground">Um único saldo por material e cor. Novas entradas são somadas ao mesmo cadastro.</p>
   </div>
@@ -51,6 +51,18 @@
       @if (query()) { <button hlmBtn variant="ghost" class="mt-4" type="button" (click)="query.set('')">Limpar pesquisa</button> }
     </div>
   }
+
+  <h2 class="mt-9 text-xl font-semibold">Insumos por unidade</h2>
+  <p class="mt-2 text-sm text-muted-foreground">Ex.: argolas para chaveiros. O saldo e o consumo são números inteiros; o preço é por peça.</p>
+  <p class="my-4 text-sm text-muted-foreground" aria-live="polite">{{ units().length }} {{ units().length === 1 ? 'insumo encontrado' : 'insumos encontrados' }}</p>
+  @if (units().length) {
+    <div hlmTableContainer class="rounded-2xl border border-border bg-card">
+      <table hlmTable>
+        <thead hlmTHead class="bg-muted/50"><tr hlmTr><th hlmTh class="px-5 py-3" scope="col">Insumo</th><th hlmTh class="px-5 py-3 text-right" scope="col">Saldo disponível</th><th hlmTh class="px-5 py-3 text-right" scope="col">Preço por unidade</th><th hlmTh class="px-5 py-3 text-right" scope="col">Ações</th></tr></thead>
+        <tbody hlmTBody>@for (item of units(); track item.id) { <tr hlmTr><td hlmTd class="px-5 py-4 font-medium">{{ item.name }}</td><td hlmTd class="px-5 py-4 text-right tabular-nums">{{ item.balanceUnits }} un.</td><td hlmTd class="px-5 py-4 text-right tabular-nums">{{ money(item.pricePerUnit) }}</td><td hlmTd class="px-5 py-4 text-right"><button hlmBtn variant="outline" type="button" [attr.aria-label]="'Editar ' + item.name" (click)="openUnit(item)">Editar estoque</button></td></tr> }</tbody>
+      </table>
+    </div>
+  } @else { <p class="rounded-2xl border border-dashed border-border p-8 text-sm text-muted-foreground">Nenhum insumo por unidade encontrado. Cadastre argolas ou outros componentes para usá-los nos produtos.</p> }
 
   <hlm-dialog #filamentDialog autoFocus="dialog">
     <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar filamento" class="max-h-[90dvh] w-[min(94vw,640px)] max-w-none overflow-auto sm:max-w-none">
@@ -102,6 +114,24 @@
           <button hlmBtn variant="outline" type="button" (click)="close()">Cancelar</button>
           <button hlmBtn type="submit" [disabled]="saved()">{{ selected() ? 'Salvar alterações' : 'Cadastrar filamento' }}</button>
         </hlm-dialog-footer>
+      </form>
+    </hlm-dialog-content>
+  </hlm-dialog>
+  <hlm-dialog #unitDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar insumo por unidade" class="max-h-[90dvh] w-[min(94vw,640px)] max-w-none overflow-auto sm:max-w-none">
+      <hlm-dialog-header><h2 hlmDialogTitle class="pr-8 text-xl font-semibold">{{ selectedUnit() ? 'Editar insumo por unidade' : 'Cadastrar insumo por unidade' }}</h2><p hlmDialogDescription class="text-sm text-muted-foreground">Controle quantidades inteiras e o preço de cada unidade.</p></hlm-dialog-header>
+      <form (ngSubmit)="saveUnit()" class="space-y-5">
+        <div><label for="unit-name" class="text-sm font-medium">Nome do insumo</label><input hlmInput id="unit-name" name="unitName" [(ngModel)]="unitName" required maxlength="120" class="mt-2" placeholder="Ex.: Argola para chaveiro" /></div>
+        <div><label for="unit-price" class="text-sm font-medium">Preço por unidade (R$)</label><input hlmInput id="unit-price" name="unitPrice" type="number" [(ngModel)]="unitPrice" required min="0.01" step="0.01" class="mt-2" /></div>
+        <fieldset class="rounded-xl border border-border p-4">
+          <legend class="px-1 text-sm font-semibold">{{ selectedUnit() ? 'Atualizar estoque' : 'Estoque inicial' }}</legend>
+          @if (selectedUnit(); as item) { <p class="text-sm text-muted-foreground">Saldo atual: <strong class="font-semibold text-foreground">{{ item.balanceUnits }} un.</strong></p><hlm-toggle-group type="single" variant="outline" [nullable]="false" [value]="unitMode()" (valueChange)="setUnitMode($event)" aria-label="Como atualizar o estoque em unidades" class="mt-4 flex-wrap"><button hlmToggleGroupItem value="add">Adicionar entrada</button><button hlmToggleGroupItem value="replace">Corrigir saldo total</button></hlm-toggle-group> }
+          <label for="unit-quantity" class="mt-4 block text-sm font-medium">{{ !selectedUnit() ? 'Saldo inicial (unidades)' : unitMode() === 'add' ? 'Unidades compradas a adicionar' : 'Novo saldo total (unidades)' }}</label>
+          <input hlmInput id="unit-quantity" name="unitQuantity" type="number" [ngModel]="unitQuantity()" (ngModelChange)="unitQuantity.set($event)" [required]="!selectedUnit() || unitMode() === 'replace'" min="0" step="1" class="mt-2" />
+          @if (nextUnitBalance() !== null) { <p class="mt-4 rounded-lg bg-secondary p-3 text-sm" aria-live="polite">Saldo após salvar: <strong>{{ nextUnitBalance() }} un.</strong></p> }
+        </fieldset>
+        @if (unitError()) { <p role="alert" class="text-sm text-destructive">{{ unitError() }}</p> }
+        <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="unitDialog.close()">Cancelar</button><button hlmBtn type="submit" [disabled]="unitSaved()">{{ selectedUnit() ? 'Salvar alterações' : 'Cadastrar insumo' }}</button></hlm-dialog-footer>
       </form>
     </hlm-dialog-content>
   </hlm-dialog>

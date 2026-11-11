@@ -5,9 +5,43 @@ import { provideSpartanHlm } from '@spartan-ng/helm/utils';
 
 describe('Produtos: catálogo de prévia', () => {
   beforeEach(async () => {
+    localStorage.removeItem('crm-print-calculator-preview');
     await TestBed.configureTestingModule({ imports: [Produtos], providers: [provideSpartanHlm()] }).compileComponents();
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('abre a calculadora sobre a modal do produto e mantém os valores ao reabrir', async () => {
+    const fixture = TestBed.createComponent(Produtos);
+    document.body.append(fixture.nativeElement);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    document.querySelector<HTMLButtonElement>('.product-card')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    document.querySelector<HTMLButtonElement>('[role="dialog"] button')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    let dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"]');
+    expect(dialogs).toHaveLength(2);
+    expect(dialogs[0].textContent).toContain('Detalhes do produto');
+    expect(dialogs[1].textContent).toContain('Calculadora de impressão 3D');
+
+    const input = dialogs[1].querySelector<HTMLInputElement>('#calc-filament-price')!;
+    input.value = '95';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    dialogs[1].querySelector<HTMLButtonElement>('button[hlmdialogclose]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+
+    [...dialogs[0].querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Abrir calculadora')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"]');
+    expect(dialogs[1].querySelector<HTMLInputElement>('#calc-filament-price')?.value).toBe('95');
+  });
 
   it('identifica a modal pelo título, fecha por Escape e devolve o foco ao produto', async () => {
     const fixture = TestBed.createComponent(Produtos);

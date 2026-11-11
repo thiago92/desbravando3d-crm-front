@@ -43,12 +43,18 @@ export class FilamentsPreview {
   ]);
   readonly filaments = this.entries.asReadonly();
 
-  consume(requirements: ReadonlyMap<string, number>): { error: string } | { consumed: true } {
+  validateConsumption(requirements: ReadonlyMap<string, number>): { error: string } | { valid: true } {
     for (const [id, grams] of requirements) {
       const filament = this.entries().find((item) => item.id === id);
       if (!filament || !validAmount(grams) || grams <= 0) return { error: 'Revise os filamentos e as quantidades previstas.' };
       if (filament.balanceGrams < grams) return { error: `Estoque insuficiente de ${filament.name}. Registre uma entrada antes de confirmar.` };
     }
+    return { valid: true };
+  }
+
+  consume(requirements: ReadonlyMap<string, number>): { error: string } | { consumed: true } {
+    const check = this.validateConsumption(requirements);
+    if ('error' in check) return check;
     this.entries.update((items) => items.map((item) => {
       const grams = requirements.get(item.id);
       return grams === undefined ? item : { ...item, balanceGrams: (Math.round(item.balanceGrams * 100) - Math.round(grams * 100)) / 100 };

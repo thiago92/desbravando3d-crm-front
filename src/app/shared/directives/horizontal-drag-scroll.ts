@@ -1,6 +1,6 @@
 import { DestroyRef, Directive, ElementRef, inject } from '@angular/core';
 
-/** Pan do quadro com mouse; não move cartões nem altera etapas. */
+/** Pan horizontal do quadro com mouse; não move cartões nem altera etapas. */
 @Directive({
   selector: '[appHorizontalDragScroll]',
   host: {

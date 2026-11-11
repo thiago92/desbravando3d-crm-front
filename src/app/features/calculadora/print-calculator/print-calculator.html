@@ -1,8 +1,8 @@
-<section class="mt-10 border-t border-border pt-10" aria-labelledby="print-calculator-heading">
+<section [class.mt-10]="!embedded()" [class.border-t]="!embedded()" [class.border-border]="!embedded()" [class.pt-10]="!embedded()" [attr.aria-labelledby]="embedded() ? null : 'print-calculator-heading'">
   <div class="flex flex-wrap items-start justify-between gap-4">
     <div>
-      <h2 id="print-calculator-heading" class="text-2xl font-semibold tracking-tight">Calculadora de impressão 3D</h2>
-      <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Simule o preço de uma peça com os valores informados agora. Esta simulação não usa os percentuais nem as taxas cadastradas acima.</p>
+      @if (!embedded()) { <h2 id="print-calculator-heading" class="text-2xl font-semibold tracking-tight">Calculadora de impressão 3D</h2> }
+      <p class="max-w-3xl text-sm leading-6 text-muted-foreground" [class.mt-2]="!embedded()">Simule o preço de uma peça com os valores informados aqui. Os últimos valores ficam salvos neste navegador até você limpar os campos. Esta simulação não usa os percentuais nem as taxas cadastradas em Precificação.</p>
     </div>
     @if (hasAnyInput()) {
       <button hlmBtn variant="outline" type="button" (click)="clear()" class="h-10">Limpar campos</button>

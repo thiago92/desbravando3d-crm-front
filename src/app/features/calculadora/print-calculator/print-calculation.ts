@@ -5,6 +5,7 @@ export interface PrintCalculationInputs {
   averagePowerW: number | null;
   tariffPerKwh: number | null;
   markupPercent: number | null;
+  additionalMaterialCost?: number | null;
 }
 
 export interface PrintCalculationResult {
@@ -18,7 +19,7 @@ export function calculatePrintPrice(inputs: PrintCalculationInputs): PrintCalcul
   const values = Object.values(inputs);
   if (values.some((value) => value === null || !Number.isFinite(value) || value < 0)) return null;
 
-  const materialCost = (inputs.filamentPricePerKg! / 1000) * inputs.filamentGrams!;
+  const materialCost = (inputs.filamentPricePerKg! / 1000) * inputs.filamentGrams! + (inputs.additionalMaterialCost ?? 0);
   const energyCost = (inputs.averagePowerW! / 1000) * inputs.printHours! * inputs.tariffPerKwh!;
   const directCost = materialCost + energyCost;
   const suggestedPrice = directCost * (1 + inputs.markupPercent! / 100);

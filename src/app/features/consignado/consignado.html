@@ -1,0 +1,178 @@
+<section class="mx-auto w-full min-w-0 max-w-[1600px]">
+  <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Prévia do CRM</p>
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+    <div><h1 class="text-3xl font-semibold tracking-tight">Consignado</h1><p class="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Acompanhe um produto por consignação, desde o orçamento até as vendas, acertos e devoluções.</p></div>
+    <button hlmBtn type="button" (click)="openCreate()">+ Novo consignado</button>
+  </div>
+  <p class="mt-4 text-xs leading-5 text-muted-foreground">Quadro de exemplo com lojas e valores fictícios. Novos cadastros e movimentações ficam em memória nesta visita; a integração com Clientes e lojas será definida depois.</p>
+
+  <div class="mt-7 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+    <div class="w-full sm:max-w-sm">
+      <label for="consignment-search" class="text-sm font-medium">Buscar consignação</label>
+      <input hlmInput id="consignment-search" type="search" class="mt-2" placeholder="Número, loja ou produto" [ngModel]="query()" (ngModelChange)="query.set($event)" />
+    </div>
+    <p class="text-sm text-muted-foreground" role="status">{{ filtered().length }} {{ filtered().length === 1 ? 'consignação encontrada' : 'consignações encontradas' }}</p>
+  </div>
+  <p id="consignment-board-help" class="my-4 text-xs text-muted-foreground">Arraste o quadro com o mouse ou deslize para os lados. Role cada coluna para consultar seus cartões e abra um cartão para ver os detalhes. As colunas de acerto e devolução são uma proposta visual desta prévia.</p>
+
+  <div #board appHorizontalDragScroll class="kanban-board" role="region" aria-label="Quadro de consignações" aria-describedby="consignment-board-help" tabindex="0">
+    @for (column of columns(); track column.id) {
+      <section class="kanban-column" [attr.data-stage]="column.id" [attr.aria-labelledby]="'consignment-stage-' + column.id">
+        <header class="column-header">
+          <h2 [id]="'consignment-stage-' + column.id" class="text-sm font-semibold">{{ column.label }}</h2>
+          <span class="column-count" [attr.aria-label]="column.cards.length + ' consignações nesta etapa'">{{ column.cards.length }}</span>
+        </header>
+        <div class="column-content" role="region" [attr.aria-label]="'Consignações em ' + column.label" tabindex="0">
+          @for (card of column.cards; track card.number) {
+            <article hlmCard class="consignment-card gap-0 overflow-hidden py-0">
+              <button hlmBtn variant="ghost" type="button" class="h-auto w-full flex-col items-stretch gap-3 whitespace-normal rounded-xl p-4 text-left font-normal" [attr.aria-label]="'Ver consignação ' + card.number + ' da ' + card.store" (click)="open(card)">
+                <span class="text-xs font-semibold text-muted-foreground">{{ card.number }}</span>
+                <span class="break-words text-base font-semibold leading-5">{{ card.store }}</span>
+                <span class="break-words text-sm text-muted-foreground">{{ card.product }}</span>
+                <span class="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-3 text-xs">
+                  <span><span class="block text-muted-foreground">Unidades</span><span class="mt-1 block font-semibold tabular-nums">{{ card.quantity }}</span></span>
+                  <span><span class="block text-muted-foreground">{{ beforeDelivery(card) ? 'A entregar' : 'Com a loja' }}</span><span class="mt-1 block font-semibold tabular-nums">{{ remaining(card) }}</span></span>
+                  <span><span class="block text-muted-foreground">Vendidas</span><span class="mt-1 block font-semibold tabular-nums">{{ card.sold }}</span></span>
+                  <span><span class="block text-muted-foreground">Devolvidas</span><span class="mt-1 block font-semibold tabular-nums">{{ card.returned }}</span></span>
+                </span>
+                <span class="space-y-2 border-t border-border pt-3 text-xs">
+                  <span class="flex justify-between gap-2"><span class="text-muted-foreground">Preço por unidade</span><span class="font-medium tabular-nums">{{ money(card.unitPrice) }}</span></span>
+                  <span class="flex justify-between gap-2"><span class="text-muted-foreground">Total previsto</span><span class="font-medium tabular-nums">{{ money(card.unitPrice * card.quantity) }}</span></span>
+                  <span class="flex justify-between gap-2"><span class="text-muted-foreground">Recebido</span><span class="font-medium tabular-nums">{{ money(card.received) }}</span></span>
+                  <span class="flex justify-between gap-2" [class.font-semibold]="pending(card) > 0"><span [class.text-muted-foreground]="pending(card) === 0">A receber das vendas</span><span class="tabular-nums">{{ money(pending(card)) }}</span></span>
+                </span>
+              </button>
+            </article>
+          } @empty {
+            <p class="empty-column">{{ query().trim() ? 'Nenhum resultado nesta etapa.' : 'Nenhuma consignação nesta etapa.' }}</p>
+          }
+        </div>
+      </section>
+    }
+  </div>
+
+  <hlm-dialog #detailsDialog autoFocus="dialog" (closed)="dialogClosed()">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar consignação" class="max-h-[90dvh] w-[min(96vw,900px)] max-w-none overflow-auto sm:max-w-none">
+      @if (creating()) {
+        <hlm-dialog-header>
+          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Novo consignado</h2>
+          <p hlmDialogDescription class="text-sm text-muted-foreground">Escolha uma loja de exemplo, um produto e a configuração do orçamento. A consignação começará em Em orçamento.</p>
+        </hlm-dialog-header>
+        <form class="space-y-5" (ngSubmit)="saveCreate()">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div><label for="create-consignment-store" class="text-sm font-medium">Cliente para consignação</label><hlm-native-select class="mt-2 w-full" selectId="create-consignment-store" name="store" [(ngModel)]="createStore"><option hlmNativeSelectOption value="">Escolha o cliente</option>@for (store of stores(); track store) { <option hlmNativeSelectOption [value]="store">{{ store }}</option> }</hlm-native-select></div>
+            <div><label for="create-consignment-product" class="text-sm font-medium">Produto</label><hlm-native-select class="mt-2 w-full" selectId="create-consignment-product" name="product" [ngModel]="createProductId" (ngModelChange)="createProductChanged($event)"><option hlmNativeSelectOption value="">Escolha o produto</option>@for (product of products(); track product.id) { <option hlmNativeSelectOption [value]="product.id">{{ product.name }}</option> }</hlm-native-select></div>
+            <div><label for="create-consignment-size" class="text-sm font-medium">Tamanho</label><hlm-native-select class="mt-2 w-full" selectId="create-consignment-size" name="size" [(ngModel)]="createSizeId"><option hlmNativeSelectOption value="">Escolha o tamanho</option>@for (size of createSizes(); track size.id) { <option hlmNativeSelectOption [value]="size.id">{{ size.weightGrams != null ? measure(size.weightGrams) + ' g' : 'Peso não informado' }} · {{ measure(size.heightCm) }} × {{ measure(size.widthCm) }} × {{ measure(size.depthCm) }} cm</option> }</hlm-native-select></div>
+            <div><label for="create-consignment-quantity" class="text-sm font-medium">Quantidade</label><input hlmInput id="create-consignment-quantity" name="quantity" type="number" min="1" step="1" required [(ngModel)]="createQuantity" class="mt-2" /></div>
+            <div><label for="create-consignment-margin" class="text-sm font-medium">Margem de lucro</label><hlm-native-select class="mt-2 w-full" selectId="create-consignment-margin" name="margin" [ngModel]="createMarginId" (ngModelChange)="createMarginId = +$event"><option hlmNativeSelectOption value="">Escolha a margem</option>@for (margin of margins; track margin.id) { <option hlmNativeSelectOption [value]="margin.id">{{ margin.name }} · {{ margin.percentage }}%</option> }</hlm-native-select></div>
+          </div>
+          @if (createPrice(); as price) { <div class="grid gap-3 sm:grid-cols-2"><p class="rounded-xl bg-muted/50 p-4 text-sm">Preço calculado por unidade <strong class="mt-1 block text-lg">{{ money(price.unitPrice) }}</strong></p><p class="rounded-xl bg-muted/50 p-4 text-sm">Total previsto <strong class="mt-1 block text-lg">{{ money(price.lineTotal) }}</strong></p></div> }
+          <p class="text-xs text-muted-foreground">O valor combinado usa filamentos, insumos por unidade, horas, energia e margem. O preço manual do catálogo não entra no orçamento. O estoque é baixado na confirmação.</p>
+          @if (createError()) { <p role="alert" class="text-sm text-destructive">{{ createError() }}</p> }
+          <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="close()">Cancelar</button><button hlmBtn type="submit">Salvar consignado</button></hlm-dialog-footer>
+        </form>
+      }
+      @if (selected(); as card) {
+        <hlm-dialog-header>
+          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Consignação {{ card.number }}</h2>
+          <p hlmDialogDescription class="text-sm text-muted-foreground">Detalhes fictícios para validar a apresentação do consignado.</p>
+        </hlm-dialog-header>
+
+        <section aria-labelledby="consignment-store-heading">
+          <p id="consignment-store-heading" class="text-xs text-muted-foreground">Loja</p>
+          <h3 class="mt-1 text-xl font-semibold">{{ card.store }}</h3>
+          <div class="mt-3 flex flex-wrap gap-2 text-xs"><span class="rounded-md bg-secondary px-3 py-2 font-medium text-secondary-foreground">Coluna: {{ selectedStage()?.label }}</span><span class="rounded-md border border-border px-3 py-2">Etapa: {{ operationalLabel(card) }}</span></div>
+        </section>
+
+        <section aria-labelledby="consignment-product-heading" class="rounded-xl border border-border p-4">
+          <h3 id="consignment-product-heading" class="font-semibold">Produto consignado</h3>
+          <div class="mt-4 flex items-start gap-4">
+            <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-center text-xs text-muted-foreground sm:size-24">
+              @if (productImage(card); as image) { <img class="size-full object-contain" [src]="image" [alt]="'Imagem de ' + card.product" (error)="imageFailed(card)" /> }
+              @else { <span>Sem imagem</span> }
+            </div>
+            <div class="min-w-0"><p class="break-words font-medium">{{ card.product }}</p><p class="mt-2 text-sm text-muted-foreground">{{ card.quantity }} {{ card.quantity === 1 ? 'unidade prevista' : 'unidades previstas' }}</p><p class="mt-2 text-sm">Valor combinado por unidade: <strong>{{ money(card.unitPrice) }}</strong></p></div>
+          </div>
+          @if (sizeFor(card); as size) {
+            <div class="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+              <p class="font-medium">{{ card.marginId ? 'Consumo cadastrado para o orçamento' : 'Consumo estimado do tamanho de exemplo' }}</p>
+              @for (line of size.materials; track line.filamentId) { <p class="mt-1">{{ filamentName(line.filamentId) }}: {{ measure(line.gramsPerUnit) }} g por peça · {{ measure(line.gramsPerUnit * card.quantity) }} g no total</p> }
+            </div>
+          }
+          @if (card.stage === 'quote' && card.productId && card.sizeId) {
+            <div class="mt-4 border-t border-border pt-4">
+              <div class="flex items-center gap-3"><hlm-checkbox inputId="consignment-real-consumption" name="realConsumption" [ngModel]="consumptionDraft.enabled" (ngModelChange)="setRealConsumption($event)" /><label for="consignment-real-consumption" class="cursor-pointer text-sm font-medium">Informar consumo real de filamento</label></div>
+              @if (consumptionDraft.enabled) {
+                <p class="mt-2 text-xs text-muted-foreground">Informe o total usado para as {{ card.quantity }} peças, incluindo purga. Estes valores alteram apenas a baixa de estoque; o preço combinado continua baseado no cadastro do produto.</p>
+                @for (line of consumptionDraft.lines; track $index; let lineIndex = $index) {
+                  <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                    <div><label class="mb-1 block text-xs" [for]="'consignment-real-filament-' + lineIndex">Filamento</label><hlm-native-select class="w-full" [selectId]="'consignment-real-filament-' + lineIndex" [name]="'realFilament' + lineIndex" [(ngModel)]="line.filamentId"><option hlmNativeSelectOption value="">Escolha o filamento</option>@for (filament of filaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></div>
+                    <label class="text-xs font-medium">Total usado (g)<input hlmInput [id]="'consignment-real-grams-' + lineIndex" [name]="'realGrams' + lineIndex" type="number" min="0.01" step="0.01" [(ngModel)]="line.grams" class="mt-1" /></label>
+                    <button hlmBtn variant="ghost" type="button" (click)="removeConsumptionLine(lineIndex)" [attr.aria-label]="'Remover filamento real ' + (lineIndex + 1)">Remover</button>
+                  </div>
+                }
+                <button hlmBtn variant="outline" size="sm" type="button" class="mt-3" (click)="addConsumptionLine()">Adicionar filamento</button>
+              }
+              @if (consumptionChanged(card)) { <button hlmBtn size="sm" type="button" class="mt-3 block" (click)="saveConsumption()">Salvar consumo de estoque</button> }
+            </div>
+          }
+          @if (card.filamentConsumptionOverride; as realLines) { <div class="mt-4 rounded-lg border border-border p-3 text-xs"><p class="font-medium">Consumo real informado para baixa no estoque</p>@for (line of realLines; track line.filamentId) { <p class="mt-1">{{ filamentName(line.filamentId) }}: {{ measure(line.grams) }} g no total</p> }</div> }
+        </section>
+
+        <section aria-labelledby="consignment-quantities-heading">
+          <h3 id="consignment-quantities-heading" class="font-semibold">Unidades</h3>
+          <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-xl bg-muted/50 p-4"><dt class="text-xs text-muted-foreground">Total previsto</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ card.quantity }}</dd></div>
+            <div class="rounded-xl bg-muted/50 p-4"><dt class="text-xs text-muted-foreground">{{ beforeDelivery(card) ? 'A entregar' : 'Com a loja' }}</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ remaining(card) }}</dd></div>
+            <div class="rounded-xl bg-muted/50 p-4"><dt class="text-xs text-muted-foreground">Vendidas</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ card.sold }}</dd></div>
+            <div class="rounded-xl bg-muted/50 p-4"><dt class="text-xs text-muted-foreground">Devolvidas</dt><dd class="mt-1 text-xl font-semibold tabular-nums">{{ card.returned }}</dd></div>
+          </dl>
+          <p class="mt-2 text-xs text-muted-foreground">As unidades vendidas e devolvidas são contabilizadas separadamente.</p>
+        </section>
+
+        <section aria-labelledby="consignment-values-heading">
+          <h3 id="consignment-values-heading" class="font-semibold">Valores</h3>
+          <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-xl border border-border p-4"><dt class="text-xs text-muted-foreground">Valor total previsto</dt><dd class="mt-1 text-lg font-semibold tabular-nums">{{ money(card.unitPrice * card.quantity) }}</dd></div>
+            <div class="rounded-xl border border-border p-4"><dt class="text-xs text-muted-foreground">Valor das unidades vendidas</dt><dd class="mt-1 text-lg font-semibold tabular-nums">{{ money(soldValue(card)) }}</dd></div>
+            <div class="rounded-xl border border-border p-4"><dt class="text-xs text-muted-foreground">Recebido</dt><dd class="mt-1 text-lg font-semibold tabular-nums">{{ money(card.received) }}</dd></div>
+            <div class="rounded-xl border border-border p-4"><dt class="text-xs text-muted-foreground">A receber das vendas</dt><dd class="mt-1 text-lg font-semibold tabular-nums">{{ money(pending(card)) }}</dd></div>
+          </dl>
+          <p class="mt-2 text-xs text-muted-foreground">O valor a receber considera apenas as unidades vendidas. Unidades ainda na loja ou devolvidas não geram recebimento nesta prévia.</p>
+        </section>
+
+        @if (card.stage === 'with-store') {
+          <section aria-labelledby="consignment-actions-heading" class="space-y-4 border-t border-border pt-5">
+            <div><h3 id="consignment-actions-heading" class="font-semibold">Atualizar consignação</h3><p class="mt-1 text-xs text-muted-foreground">Registre novas unidades ou um recebimento. Cada lançamento soma ao total atual e atualiza o cartão imediatamente.</p></div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <form class="space-y-3 rounded-xl border border-border p-4" (ngSubmit)="recordSale()">
+                <label for="consignment-sale-quantity" class="text-sm font-medium">Unidades Vendidas</label>
+                <input hlmInput id="consignment-sale-quantity" name="saleQuantity" type="number" min="1" [max]="remaining(card)" step="1" [(ngModel)]="saleQuantity" class="mt-2" />
+                <p class="text-xs text-muted-foreground">Disponíveis com a loja: {{ remaining(card) }}.</p>
+                <button hlmBtn variant="outline" type="submit" [disabled]="remaining(card) === 0">Registrar venda</button>
+              </form>
+              <form class="space-y-3 rounded-xl border border-border p-4" (ngSubmit)="recordReturn()">
+                <label for="consignment-return-quantity" class="text-sm font-medium">Unidades devolvidas pela loja</label>
+                <input hlmInput id="consignment-return-quantity" name="returnQuantity" type="number" min="1" [max]="remaining(card)" step="1" [(ngModel)]="returnQuantity" class="mt-2" />
+                <p class="text-xs text-muted-foreground">Só unidades não vendidas podem ser devolvidas.</p>
+                <button hlmBtn variant="outline" type="submit" [disabled]="remaining(card) === 0">Registrar devolução</button>
+              </form>
+            </div>
+            <form class="space-y-3 rounded-xl border border-border p-4" (ngSubmit)="recordPayment()">
+              <label for="consignment-payment" class="text-sm font-medium">Valor recebido das vendas (R$)</label>
+              <input hlmInput id="consignment-payment" name="paymentAmount" type="number" min="0.01" [max]="pending(card)" step="0.01" [(ngModel)]="paymentAmount" class="mt-2 sm:max-w-xs" />
+              <p class="text-xs text-muted-foreground">Pode ser parte do valor de uma peça. A receber agora: {{ money(pending(card)) }}.</p>
+              <button hlmBtn type="submit" [disabled]="pending(card) === 0">Registrar recebimento</button>
+            </form>
+          </section>
+        }
+
+        @if (card.stage !== 'with-store' && !card.productId) { <p class="rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">Este cartão fictício não tem tamanho vinculado e não gera baixa de estoque nesta prévia.</p> }
+        @if (notice()) { <p role="status" class="text-sm text-muted-foreground">{{ notice() }}</p> }
+        @if (error()) { <p role="alert" class="text-sm text-destructive">{{ error() }}</p> }
+
+        <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="close()">Fechar</button>@if (action(); as next) { <button hlmBtn type="button" (click)="advance()">{{ next.label }}</button> }</hlm-dialog-footer>
+      }
+    </hlm-dialog-content>
+  </hlm-dialog>
+</section>

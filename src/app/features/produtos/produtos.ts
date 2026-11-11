@@ -12,19 +12,24 @@ import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { FilamentsPreview } from '../insumos/filaments-preview';
+import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
+import { PrintCalculator } from '../calculadora/print-calculator/print-calculator';
 import { formatMeasure, formatMoney, normalizeSearch } from '../../shared/utils/presentation';
 
 @Component({
   selector: 'app-produtos',
-  imports: [FormsModule, ProductGallery, HlmButton, HlmInput, ...HlmDialogImports, ...HlmTableImports, ...HlmToggleGroupImports, ...HlmRadioGroupImports, ...HlmNativeSelectImports, HlmTextarea, HlmCheckbox],
+  imports: [FormsModule, ProductGallery, PrintCalculator, HlmButton, HlmInput, ...HlmDialogImports, ...HlmTableImports, ...HlmToggleGroupImports, ...HlmRadioGroupImports, ...HlmNativeSelectImports, HlmTextarea, HlmCheckbox],
   templateUrl: './produtos.html',
   styleUrl: './produtos.css',
 })
 export class Produtos {
   @ViewChild('productDialog') private dialog?: HlmDialog;
+  @ViewChild('calculatorDialog') private calculatorDialog?: HlmDialog;
   private readonly catalog = inject(ProductsPreview);
   private readonly inventory = inject(FilamentsPreview);
+  private readonly unitInventory = inject(UnitSuppliesPreview);
   protected readonly filaments = this.inventory.filaments;
+  protected readonly unitSupplies = this.unitInventory.supplies;
   protected readonly query = signal('');
   protected readonly view = signal<'grid' | 'table'>('grid');
   protected readonly selected = signal<ProductPreview | null>(null);
@@ -39,7 +44,7 @@ export class Produtos {
   });
   protected name = '';
   protected description = '';
-  protected sizes: { id: string; name: string; heightCm: number | null; widthCm: number | null; depthCm: number | null; price: number | null; printHours: number | null; weightGrams?: number | null; materials: { filamentId: string; gramsPerUnit: number | null }[] }[] = [];
+  protected sizes: { id: string; name: string; heightCm: number | null; widthCm: number | null; depthCm: number | null; price: number | null; printHours: number | null; weightGrams?: number | null; materials: { filamentId: string; gramsPerUnit: number | null }[]; unitMaterials: { supplyId: string; unitsPerUnit: number | null }[] }[] = [];
   protected customSizes = false;
   protected readonly selectedSizeIndex = signal(0);
   protected readonly selectedSize = computed(() => this.selected()?.sizes[this.selectedSizeIndex()] ?? null);
@@ -59,7 +64,7 @@ export class Produtos {
     const product = this.selected();
     this.name = product?.name ?? '';
     this.description = product?.description ?? '';
-    this.sizes = (product?.sizes ?? []).map((size) => ({ ...size, materials: size.materials.map((line) => ({ ...line })) }));
+    this.sizes = (product?.sizes ?? []).map((size) => ({ ...size, materials: size.materials.map((line) => ({ ...line })), unitMaterials: (size.unitMaterials ?? []).map((line) => ({ ...line })) }));
     this.customSizes = product?.customSizes ?? false;
     this.image.set(product?.image ?? '');
     this.gallery.set([...(product?.gallery ?? [])]);
@@ -69,11 +74,14 @@ export class Produtos {
   protected edit(): void { this.fillForm(); this.editing.set(true); }
 
   protected addSize(): void {
-    this.sizes.push({ id: crypto.randomUUID(), name: '', heightCm: null, widthCm: null, depthCm: null, price: null, printHours: null, materials: [] });
+    this.sizes.push({ id: crypto.randomUUID(), name: '', heightCm: null, widthCm: null, depthCm: null, price: null, printHours: null, materials: [], unitMaterials: [] });
   }
 
   protected addSizeMaterial(index: number): void { this.sizes[index].materials.push({ filamentId: '', gramsPerUnit: null }); }
   protected removeSizeMaterial(index: number, line: number): void { this.sizes[index].materials.splice(line, 1); }
+  protected addUnitMaterial(index: number): void { this.sizes[index].unitMaterials.push({ supplyId: '', unitsPerUnit: null }); }
+  protected removeUnitMaterial(index: number, line: number): void { this.sizes[index].unitMaterials.splice(line, 1); }
+  protected unitMaterialName(id: string): string { return this.unitSupplies().find((item) => item.id === id)?.name ?? 'Insumo indisponível'; }
   protected filamentName(id: string): string {
     const filament = this.filaments().find((entry) => entry.id === id);
     return filament ? `${filament.material} ${filament.color}` : 'Filamento indisponível';
@@ -98,6 +106,8 @@ export class Produtos {
   }
 
   protected close(): void { this.dialog?.close(); }
+
+  protected openCalculator(): void { this.calculatorDialog?.open(); }
 
   protected cancelEdit(): void {
     this.imageRequest++;
@@ -164,7 +174,11 @@ export class Produtos {
       this.error.set('Informe horas de impressão e pelo menos um filamento por tamanho, com gramas por unidade maiores que zero e sem repetir filamentos. Use até duas casas decimais.');
       return;
     }
-    const sizes = this.sizes.map((size) => ({ ...size, name: size.name.trim(), printHours: size.printHours!, materials: size.materials.map((line) => ({ filamentId: line.filamentId, gramsPerUnit: line.gramsPerUnit! })) })) as ProductSize[];
+    if (this.sizes.some((size) => size.unitMaterials.some((line) => !this.unitSupplies().some((item) => item.id === line.supplyId) || !Number.isSafeInteger(line.unitsPerUnit) || line.unitsPerUnit === null || line.unitsPerUnit <= 0) || new Set(size.unitMaterials.map((line) => line.supplyId)).size !== size.unitMaterials.length)) {
+      this.error.set('Escolha insumos por unidade cadastrados, com quantidades inteiras positivas e sem repetições.');
+      return;
+    }
+    const sizes = this.sizes.map((size) => ({ ...size, name: size.name.trim(), printHours: size.printHours!, materials: size.materials.map((line) => ({ filamentId: line.filamentId, gramsPerUnit: line.gramsPerUnit! })), unitMaterials: size.unitMaterials.map((line) => ({ supplyId: line.supplyId, unitsPerUnit: line.unitsPerUnit! })) })) as ProductSize[];
     const saved = this.catalog.save({ name: this.name.trim(), description: this.description.trim(), image: this.image() || null, gallery: this.gallery().length ? [...this.gallery()] : null, sizes, customSizes: this.customSizes }, this.selected()?.id);
     this.selected.set(saved);
     this.selectedSizeIndex.set(0);

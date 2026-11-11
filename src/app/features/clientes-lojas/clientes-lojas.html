@@ -1,0 +1,99 @@
+<section class="mx-auto w-full max-w-6xl">
+  <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Prévia do CRM</p>
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+    <div><h1 class="text-3xl font-semibold tracking-tight">Clientes e lojas</h1><p class="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Consulte as pessoas e lojas presentes nesta prévia.</p></div>
+    <button hlmBtn type="button" (click)="openCreate()">+ Cadastrar cliente</button>
+  </div>
+  <p class="mt-4 text-xs leading-5 text-muted-foreground">Os contatos dos exemplos são fictícios. Novos cadastros ficam em memória durante a visita. Clique em um nome para consultar seus registros e status.</p>
+
+  <div class="mt-7 rounded-2xl border border-border bg-card p-5">
+    <label for="contact-search" class="block text-sm font-medium">Buscar cliente ou loja</label>
+    <input hlmInput id="contact-search" type="search" class="mt-2 w-full sm:max-w-sm" placeholder="Nome ou tipo" [ngModel]="query()" (ngModelChange)="query.set($event)" />
+  </div>
+  <p class="my-4 text-sm text-muted-foreground" role="status">{{ filtered().length }} {{ filtered().length === 1 ? 'contato encontrado' : 'contatos encontrados' }}</p>
+
+  <div hlmTableContainer class="rounded-2xl border border-border bg-card">
+    <table hlmTable class="w-full min-w-[640px] text-left text-sm">
+      <thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-5 py-3 font-medium sm:px-6">Nome</th><th hlmTh scope="col" class="w-28 px-5 py-3 font-medium">Tipo</th><th hlmTh scope="col" class="w-40 px-5 py-3 font-medium">Telefone</th><th hlmTh scope="col" class="w-40 px-5 py-3 font-medium sm:px-6">WhatsApp</th></tr></thead>
+      <tbody hlmTBody>
+        @for (contact of filtered(); track contact.id) {
+          <tr hlmTr><td hlmTd class="px-5 py-4 sm:px-6"><button hlmBtn variant="ghost" type="button" class="h-auto px-0 text-left font-medium underline-offset-4 hover:underline" [attr.aria-label]="'Consultar ' + typeNameFor(contact.typeId).toLowerCase() + ' ' + contact.name" (click)="open(contact)">{{ contact.name }}</button></td><td hlmTd class="px-5 py-4 text-muted-foreground">{{ typeNameFor(contact.typeId) }}</td><td hlmTd class="px-5 py-4 text-muted-foreground">{{ contact.phone ?? 'Não informado' }}</td><td hlmTd class="px-5 py-4 text-muted-foreground sm:px-6">{{ contact.whatsapp ?? 'Não informado' }}</td></tr>
+        } @empty {
+          <tr hlmTr><td hlmTd colspan="4" class="px-5 py-10 text-center text-muted-foreground">Nenhum cliente ou loja encontrado para esta busca.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <hlm-dialog #contactDialog autoFocus="dialog" (closed)="dialogClosed()">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar contato" class="max-h-[90dvh] w-[min(96vw,800px)] max-w-none overflow-auto sm:max-w-none">
+      @if (creating()) {
+        <hlm-dialog-header>
+          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Cadastrar cliente</h2>
+          <p hlmDialogDescription class="text-sm text-muted-foreground">Escolha um tipo de cliente ou cadastre um novo. O contato ficará disponível nesta visita.</p>
+        </hlm-dialog-header>
+        <form class="space-y-5" (ngSubmit)="saveCreate()">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="sm:col-span-2"><label for="create-contact-name" class="text-sm font-medium">Nome</label><input hlmInput id="create-contact-name" name="name" type="text" maxlength="120" required [(ngModel)]="createName" class="mt-2" /></div>
+            <div><label for="create-contact-type" class="text-sm font-medium">Tipo de cliente</label><div class="mt-2 flex flex-wrap gap-2"><hlm-native-select class="min-w-0 flex-1" selectId="create-contact-type" [value]="createTypeId" (valueChange)="createTypeId = $event ?? ''"><option hlmNativeSelectOption value="">Escolha o tipo</option>@for (type of types(); track type.id) { <option hlmNativeSelectOption [value]="type.id">{{ type.name }}</option> }</hlm-native-select><button hlmBtn variant="outline" type="button" class="shrink-0" (click)="openCreateType()">+ Cadastrar tipo</button></div></div>
+            <div><label for="create-contact-phone" class="text-sm font-medium">Telefone · opcional</label><input hlmInput id="create-contact-phone" name="phone" type="tel" maxlength="30" [(ngModel)]="createPhone" class="mt-2" /></div>
+            <div><label for="create-contact-whatsapp" class="text-sm font-medium">WhatsApp · opcional</label><input hlmInput id="create-contact-whatsapp" name="whatsapp" type="tel" maxlength="30" [(ngModel)]="createWhatsapp" class="mt-2" /></div>
+          </div>
+          @if (createError()) { <p role="alert" class="text-sm text-destructive">{{ createError() }}</p> }
+          <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="close()">Cancelar</button><button hlmBtn type="submit">Salvar cliente</button></hlm-dialog-footer>
+        </form>
+      }
+      @if (selected(); as contact) {
+        <hlm-dialog-header>
+          <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">{{ contact.name }}</h2>
+          <p hlmDialogDescription class="text-sm text-muted-foreground">{{ typeNameFor(contact.typeId) }} · contato da prévia, agrupado pelo nome.</p>
+        </hlm-dialog-header>
+        <section aria-label="Contato" class="grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl border border-border p-4"><p class="text-xs text-muted-foreground">Telefone</p><p class="mt-1 font-medium">{{ contact.phone ?? 'Não informado' }}</p></div>
+          <div class="rounded-xl border border-border p-4"><p class="text-xs text-muted-foreground">WhatsApp</p><p class="mt-1 font-medium">{{ contact.whatsapp ?? 'Não informado' }}</p></div>
+        </section>
+          <section aria-labelledby="contact-orders-heading">
+            <h3 id="contact-orders-heading" class="font-semibold">Encomendas ({{ contactOrders().length }})</h3>
+            <div hlmTableContainer class="mt-3 rounded-xl border border-border">
+              <table hlmTable class="w-full min-w-[520px] text-left text-sm">
+                <thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-4 py-3 font-medium">Número</th><th hlmTh scope="col" class="px-4 py-3 font-medium">Status</th><th hlmTh scope="col" class="px-4 py-3 font-medium">Pagamento</th><th hlmTh scope="col" class="px-4 py-3 text-right font-medium">Orçamento</th><th hlmTh scope="col" class="px-4 py-3 text-right font-medium">Ação</th></tr></thead>
+                <tbody hlmTBody>
+                  @for (order of contactOrders(); track order.id) {
+                    <tr hlmTr><td hlmTd class="px-4 py-3 font-medium">{{ order.number }}</td><td hlmTd class="px-4 py-3">{{ orderStatus(order.stage) }}</td><td hlmTd class="px-4 py-3">{{ order.payment === 'received' ? 'Recebido' : order.payment === 'pending' ? 'Pendente' : 'A definir' }}</td><td hlmTd class="px-4 py-3 text-right">{{ orderTotal(order.id) !== null ? money(orderTotal(order.id)!) : 'Configurar precificação' }}</td><td hlmTd class="px-4 py-3 text-right"><button hlmBtn variant="outline" size="sm" type="button" (click)="openOrder(order.id)">Abrir encomenda</button></td></tr>
+                  } @empty { <tr hlmTr><td hlmTd colspan="5" class="px-4 py-8 text-center text-muted-foreground">Nenhuma encomenda nesta prévia.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section aria-labelledby="contact-consignments-heading">
+            <h3 id="contact-consignments-heading" class="font-semibold">Consignados ({{ contactConsignments().length }})</h3>
+            <div hlmTableContainer class="mt-3 rounded-xl border border-border">
+              <table hlmTable class="w-full min-w-[620px] text-left text-sm">
+                <thead hlmTHead class="bg-muted/50 text-muted-foreground"><tr hlmTr><th hlmTh scope="col" class="px-4 py-3 font-medium">Número</th><th hlmTh scope="col" class="px-4 py-3 font-medium">Produto</th><th hlmTh scope="col" class="px-4 py-3 font-medium">Status</th><th hlmTh scope="col" class="px-4 py-3 text-right font-medium">A receber</th><th hlmTh scope="col" class="px-4 py-3 text-right font-medium">Ação</th></tr></thead>
+                <tbody hlmTBody>
+                  @for (card of contactConsignments(); track card.number) {
+                    <tr hlmTr><td hlmTd class="px-4 py-3 font-medium">{{ card.number }}</td><td hlmTd class="px-4 py-3">{{ card.product }}</td><td hlmTd class="px-4 py-3">{{ consignmentStatus(card) }}</td><td hlmTd class="px-4 py-3 text-right">{{ money(pending(card)) }}</td><td hlmTd class="px-4 py-3 text-right"><button hlmBtn variant="outline" size="sm" type="button" (click)="openConsignment(card.number)">Abrir consignado</button></td></tr>
+                  } @empty { <tr hlmTr><td hlmTd colspan="5" class="px-4 py-8 text-center text-muted-foreground">Nenhum consignado nesta prévia.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        <p class="text-xs text-muted-foreground">A ligação atual usa o nome dos exemplos. Um cadastro real precisará de identificadores próprios para evitar homônimos.</p>
+        <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="close()">Fechar</button></hlm-dialog-footer>
+      }
+    </hlm-dialog-content>
+  </hlm-dialog>
+  <hlm-dialog #typeDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar cadastro de tipo" class="w-[min(94vw,480px)] max-w-none sm:max-w-none">
+      <hlm-dialog-header>
+        <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Cadastrar tipo de cliente</h2>
+        <p hlmDialogDescription class="text-sm text-muted-foreground">Dê um nome ao novo tipo de cliente.</p>
+      </hlm-dialog-header>
+      <form class="space-y-5" (ngSubmit)="saveCreateType()">
+        <div><label for="create-type-name" class="text-sm font-medium">Nome do tipo</label><input hlmInput id="create-type-name" name="typeName" type="text" maxlength="60" required [(ngModel)]="typeName" class="mt-2" placeholder="Ex.: Revendedor" /></div>
+        @if (typeError()) { <p role="alert" class="text-sm text-destructive">{{ typeError() }}</p> }
+        <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="typeDialog.close()">Cancelar</button><button hlmBtn type="submit">Salvar tipo</button></hlm-dialog-footer>
+      </form>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</section>

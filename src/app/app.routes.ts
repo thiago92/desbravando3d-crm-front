@@ -48,13 +48,11 @@ export const routes: Routes = [
       },
       {
         path: 'consignado',
-        loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
-        data: { title: 'Consignado', description: 'Acompanharemos os produtos em cada loja, as vendas informadas e os valores recebidos.' },
+        loadComponent: () => import('./features/consignado/consignado').then((module) => module.Consignado),
       },
       {
         path: 'clientes-lojas',
-        loadComponent: () => import('./features/preview/preview').then((module) => module.Preview),
-        data: { title: 'Clientes e lojas', description: 'Os dados de clientes e lojas serão definidos junto aos fluxos de encomendas e consignação.' },
+        loadComponent: () => import('./features/clientes-lojas/clientes-lojas').then((module) => module.ClientesLojas),
       },
       {
         path: 'financeiro',
