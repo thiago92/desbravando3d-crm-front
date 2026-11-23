@@ -1,0 +1,50 @@
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { provideSpartanHlm } from '@spartan-ng/helm/utils';
+import { CashLedgerPreview } from '../financeiro/cash-ledger-preview';
+import { OrdersPreview } from '../encomendas/orders-preview';
+import { ConsignmentsPreview } from '../consignado/consignado';
+import { FilamentPurchasesPreview } from '../insumos/filament-purchases-preview';
+import { dateKey } from './dashboard-data';
+import { Dashboard } from './dashboard';
+
+describe('Dashboard', () => {
+  it('exibe operações atuais e separa os lançamentos datados pelo período', async () => {
+    await TestBed.configureTestingModule({ imports: [Dashboard], providers: [provideRouter([]), provideSpartanHlm()] }).compileComponents();
+    const fixture = TestBed.createComponent(Dashboard);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Encomendas por etapa');
+    expect(root.textContent).toContain('Unidades em consignação');
+    expect(root.querySelector('[aria-labelledby="alerts-title"] a[href*="abrir="]')).not.toBeNull();
+    expect(root.querySelector('[aria-label="Indicadores do dashboard"]')?.textContent).toContain('Sem base para comparar');
+
+    const ledger = TestBed.inject(CashLedgerPreview);
+    const date = dateKey(new Date());
+    ledger.addReceipt({ date, amount: 12, origin: 'order', reference: '#011', party: 'Cliente', method: 'Pix' });
+    ledger.addExpense({ date, amount: 5, description: 'Filamento', category: 'Insumos', method: 'Pix' });
+    fixture.detectChanges();
+    expect(root.querySelector('[aria-label="Indicadores do dashboard"]')?.textContent).toContain('R$\u00a012,00');
+    expect(root.querySelector('[aria-label="Indicadores do dashboard"]')?.textContent).toContain('R$\u00a05,00');
+    expect(root.querySelector('[aria-label="Indicadores do dashboard"]')?.textContent).toContain('R$\u00a07,00');
+    expect(root.querySelector('[aria-labelledby="sources-title"]')?.textContent).toContain('Encomendas');
+    expect(root.querySelector('[aria-labelledby="expenses-title"]')?.textContent).toContain('Insumos');
+    const orders = TestBed.inject(OrdersPreview);
+    const printing = orders.orders().find((order) => order.number === '#009')!;
+    expect(orders.recordFailure(printing.id, { date, itemIndex: 0, quantity: 1, reason: 'Falha de adesão', materials: [{ filamentId: 'filament-preview-2', grams: 20 }], hours: 2 })).toHaveProperty('saved');
+    fixture.detectChanges();
+    const failures = root.querySelector('[aria-labelledby="failures-title"]')?.textContent ?? '';
+    expect(failures).toContain('1');
+    expect(failures).toContain('R$\u00a02,44');
+    expect(root.querySelector('[aria-label="Indicadores do dashboard"]')?.textContent).toContain('R$\u00a07,00');
+    const consignments = TestBed.inject(ConsignmentsPreview);
+    expect(consignments.recordFailure('#C-012', { date, quantity: 1, reason: '', materials: [{ filamentId: 'filament-preview-2', grams: 10 }], hours: 1 })).toHaveProperty('saved');
+    const purchase = TestBed.inject(FilamentPurchasesPreview);
+    expect(purchase.record({ filamentId: 'filament-preview-1', quantityKg: 1, pricePerKg: 120, date, paymentMethod: 'Pix' })).toHaveProperty('saved');
+    fixture.detectChanges();
+    expect(root.querySelector('[aria-labelledby="failures-title"]')?.textContent).toContain('2');
+    expect(root.querySelector('[aria-labelledby="filament-entries-title"]')?.textContent).toContain('1 kg');
+    expect(root.querySelector('[aria-label="Indicadores do dashboard"]')?.textContent).toContain('R$\u00a0125,00');
+  });
+});

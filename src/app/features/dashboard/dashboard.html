@@ -1,0 +1,71 @@
+<section class="mx-auto max-w-7xl space-y-6 pb-8">
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Visão geral · Prévia do CRM</p>
+      <h1 class="mt-3 text-3xl font-semibold tracking-tight">Dashboard</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Acompanhe o dinheiro registrado e veja o que precisa da sua atenção agora.</p>
+    </div>
+    <a hlmBtn variant="outline" routerLink="/financeiro">Abrir financeiro</a>
+  </header>
+
+  <div class="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4">
+    <div class="min-w-40"><label for="dashboard-period" class="text-sm font-medium">Período financeiro</label><hlm-native-select class="mt-2 w-full" selectId="dashboard-period" [ngModel]="preset()" (ngModelChange)="selectPreset($event)"><option hlmNativeSelectOption value="month">Este mês</option><option hlmNativeSelectOption value="30">Últimos 30 dias</option><option hlmNativeSelectOption value="90">Últimos 90 dias</option><option hlmNativeSelectOption value="custom">Personalizado</option></hlm-native-select></div>
+    <div><label for="dashboard-from" class="text-sm font-medium">De</label><input hlmInput id="dashboard-from" type="date" class="mt-2" [ngModel]="from()" (ngModelChange)="setFrom($event)" /></div>
+    <div><label for="dashboard-to" class="text-sm font-medium">Até</label><input hlmInput id="dashboard-to" type="date" class="mt-2" [ngModel]="to()" (ngModelChange)="setTo($event)" /></div>
+    <p class="max-w-sm pb-2 text-xs leading-5 text-muted-foreground">O período filtra os lançamentos financeiros. Encomendas e unidades consignadas mostram a situação atual.</p>
+  </div>
+  @if (!validRange()) { <p role="alert" class="text-sm text-destructive">Escolha um período válido: a data inicial deve ser anterior ou igual à final.</p> }
+
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Indicadores do dashboard">
+    <div class="dashboard-stat dashboard-stat--received"><p>Recebido no período</p><strong>{{ formatMoney(current().received) }}</strong><small>@if (comparison().received !== null) { {{ comparison().received! > 0 ? '+' : '' }}{{ comparison().received }}% ante o período anterior } @else { Sem base para comparar }</small></div>
+    <div class="dashboard-stat dashboard-stat--paid"><p>Pago no período</p><strong>{{ formatMoney(current().paid) }}</strong><small>@if (comparison().paid !== null) { {{ comparison().paid! > 0 ? '+' : '' }}{{ comparison().paid }}% ante o período anterior } @else { Sem base para comparar }</small></div>
+    <div class="dashboard-stat"><p>Variação de caixa</p><strong>{{ formatMoney(current().change) }}</strong><small>Recebido menos pago no período</small></div>
+    <div class="dashboard-stat"><p>A receber agora</p><strong>{{ formatMoney(totalPending()) }}</strong><small>Pedidos e vendas consignadas</small></div>
+    <div class="dashboard-stat"><p>Encomendas em andamento</p><strong>{{ activeOrders() }}</strong><small>Confirmadas, em impressão ou prontas</small></div>
+  </div>
+
+  <section class="dashboard-panel" aria-labelledby="failures-title">
+    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 id="failures-title" class="text-lg font-semibold">Falhas de impressão</h2><p class="mt-1 text-sm text-muted-foreground">Encomendas e Consignado no período selecionado. Custo estimado de filamento e energia, separado do caixa.</p></div><div class="flex gap-2"><a hlmBtn variant="outline" size="sm" routerLink="/encomendas">Encomendas</a><a hlmBtn variant="outline" size="sm" routerLink="/consignado">Consignado</a></div></div>
+    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+      <div class="dashboard-stat"><p>Ocorrências</p><strong>{{ failuresInPeriod().length }}</strong></div>
+      <div class="dashboard-stat"><p>Peças inteiras perdidas</p><strong>{{ failedPieces() }}</strong></div>
+      <div class="dashboard-stat"><p>Custo estimado da perda</p><strong>{{ formatMoney(failureCost()) }}</strong><small>Material e energia; não é despesa paga</small></div>
+    </div>
+  </section>
+
+  <section class="dashboard-panel" aria-labelledby="filament-entries-title">
+    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 id="filament-entries-title" class="text-lg font-semibold">Entradas de filamento comprado</h2><p class="mt-1 text-sm text-muted-foreground">Quantidade por filamento no período selecionado. A saída de caixa aparece em Pago e nas despesas.</p></div><a hlmBtn variant="outline" size="sm" routerLink="/insumos">Ver insumos</a></div>
+    @if (filamentEntryRows().length) { <p class="mt-4 text-sm font-medium">{{ filamentEntryTotalKg() }} kg comprados no período</p><div class="mt-4 space-y-4">@for (row of filamentEntryRows(); track row.label) { <div class="dashboard-stage"><div><span>{{ row.label }}</span><strong>{{ row.grams / 1000 }} kg</strong></div><div class="dashboard-track"><span [style.width.%]="row.grams / filamentEntryMax() * 100" style="background:#06b6d4"></span></div></div> }</div> } @else { <p class="dashboard-empty mt-4">Nenhuma compra de filamento registrada neste período.</p> }
+  </section>
+
+  <div class="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,1fr)]">
+    <section class="dashboard-panel" aria-labelledby="cash-chart-title">
+      <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 id="cash-chart-title" class="text-lg font-semibold">Recebido × pago</h2><p class="mt-1 text-sm text-muted-foreground">Lançamentos datados dentro do período selecionado.</p></div><div class="flex gap-4 text-xs"><span class="dashboard-key"><i style="background:#8b5cf6"></i> Recebido</span><span class="dashboard-key"><i style="background:#f59e0b"></i> Pago</span></div></div>
+      @if (currentEntries().length) {
+        <div class="dashboard-bars" role="img" [style.grid-template-columns]="'repeat(' + buckets().length + ', minmax(0, 1fr))'" [attr.aria-label]="'Comparação por faixas do período: recebido ' + formatMoney(current().received) + ', pago ' + formatMoney(current().paid)">
+          @for (bucket of buckets(); track bucket.label) {
+            <div class="dashboard-bar-group"><div class="dashboard-bar-pair"><div class="dashboard-bar dashboard-bar--received" [style.height.%]="barHeight(bucket.received)" [attr.title]="bucket.label + ': recebido ' + formatMoney(bucket.received)"></div><div class="dashboard-bar dashboard-bar--paid" [style.height.%]="barHeight(bucket.paid)" [attr.title]="bucket.label + ': pago ' + formatMoney(bucket.paid)"></div></div><span>{{ bucket.label }}</span></div>
+          }
+        </div>
+        <ul class="sr-only">@for (bucket of buckets(); track bucket.label) { <li>A partir de {{ bucket.label }}: recebido {{ formatMoney(bucket.received) }}, pago {{ formatMoney(bucket.paid) }}.</li> }</ul>
+        <div class="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm"><div><span class="text-muted-foreground">Recebido antes</span><strong class="block tabular-nums">{{ formatMoney(previous().received) }}</strong></div><div><span class="text-muted-foreground">Pago antes</span><strong class="block tabular-nums">{{ formatMoney(previous().paid) }}</strong></div></div>
+      } @else { <div class="dashboard-empty">Ainda não há recebimentos ou despesas com data neste período. Registre um lançamento no Financeiro para acompanhar a evolução aqui.</div> }
+    </section>
+    <section class="dashboard-panel" aria-labelledby="alerts-title">
+      <div class="flex items-start justify-between gap-3"><div><h2 id="alerts-title" class="text-lg font-semibold">Precisa de atenção</h2><p class="mt-1 text-sm text-muted-foreground">Registros com próxima ação ou valor pendente.</p></div><span class="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">{{ alerts().length }}</span></div>
+      @if (alerts().length) { <ul class="mt-4 divide-y divide-border">@for (alert of alerts(); track alert.link + alert.id) { <li><a class="dashboard-alert" [routerLink]="alert.link" [queryParams]="{ abrir: alert.id }"><span><strong>{{ alert.title }}</strong><small>{{ alert.detail }}</small></span><span aria-hidden="true">↗</span></a></li> }</ul> } @else { <p class="dashboard-empty">Nenhum registro prioritário no momento.</p> }
+    </section>
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-2">
+    <section class="dashboard-panel" aria-labelledby="sources-title"><h2 id="sources-title" class="text-lg font-semibold">Origem dos recebimentos</h2><p class="mt-1 text-sm text-muted-foreground">Encomendas e repasses recebidos no período.</p><div class="dashboard-donut-layout"><div class="dashboard-donut" [style.background]="donut(receiptSegments())" role="img" [attr.aria-label]="receiptSummary()"><div><strong>{{ formatMoney(current().received) }}</strong><span>recebidos</span></div></div><div class="dashboard-legend">@for (segment of receiptSegments(); track segment.label) { <div><span class="dashboard-key"><i [style.background]="segment.color"></i>{{ segment.label }}</span><strong>{{ formatMoney(segment.value) }}</strong><small>{{ segmentPercent(segment.value, receiptSegments()) }}%</small></div> } @if (!receiptSegments().length) { <p class="text-sm text-muted-foreground">Sem recebimentos datados neste período.</p> }</div></div></section>
+    <section class="dashboard-panel" aria-labelledby="expenses-title"><h2 id="expenses-title" class="text-lg font-semibold">Despesas por categoria</h2><p class="mt-1 text-sm text-muted-foreground">Participação das despesas pagas no período.</p><div class="dashboard-donut-layout"><div class="dashboard-donut" [style.background]="donut(expenseSegments())" role="img" [attr.aria-label]="'Despesas por categoria, total ' + formatMoney(current().paid)"><div><strong>{{ formatMoney(current().paid) }}</strong><span>pagos</span></div></div><div class="dashboard-legend">@for (segment of expenseSegments(); track segment.label) { <div><span class="dashboard-key"><i [style.background]="segment.color"></i>{{ segment.label }}</span><strong>{{ formatMoney(segment.value) }}</strong><small>{{ segmentPercent(segment.value, expenseSegments()) }}%</small></div> } @if (!expenseSegments().length) { <p class="text-sm text-muted-foreground">Sem despesas datadas neste período.</p> }</div></div></section>
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-2">
+    <section class="dashboard-panel" aria-labelledby="orders-title"><div class="flex items-start justify-between gap-3"><div><h2 id="orders-title" class="text-lg font-semibold">Encomendas por etapa</h2><p class="mt-1 text-sm text-muted-foreground">Situação atual do quadro, em quantidade de registros.</p></div><a hlmBtn variant="outline" size="sm" routerLink="/encomendas">Ver quadro</a></div><div class="mt-6 space-y-4">@for (row of orderRows(); track row.id) { <div class="dashboard-stage"><div><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div><div class="dashboard-track"><span [style.width.%]="orderWidth(row.count)" [style.background]="row.color"></span></div></div> }</div></section>
+    <section class="dashboard-panel" aria-labelledby="consignment-title"><div class="flex items-start justify-between gap-3"><div><h2 id="consignment-title" class="text-lg font-semibold">Unidades em consignação</h2><p class="mt-1 text-sm text-muted-foreground">Unidades entregues: com as lojas, vendidas ou devolvidas.</p></div><a hlmBtn variant="outline" size="sm" routerLink="/consignado">Ver quadro</a></div><div class="dashboard-donut-layout"><div class="dashboard-donut" [style.background]="donut(consignmentSegments())" role="img" [attr.aria-label]="'Consignado: ' + consignmentUnits().withStore + ' com as lojas, ' + consignmentUnits().sold + ' vendidas e ' + consignmentUnits().returned + ' devolvidas'"><div><strong>{{ consignmentUnits().withStore + consignmentUnits().sold + consignmentUnits().returned }}</strong><span>entregues</span></div></div><div class="dashboard-legend">@for (segment of consignmentSegments(); track segment.label) { <div><span class="dashboard-key"><i [style.background]="segment.color"></i>{{ segment.label }}</span><strong>{{ segment.value }}</strong><small>{{ segmentPercent(segment.value, consignmentSegments()) }}%</small></div> }</div></div><div class="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4 text-sm"><div><span class="text-muted-foreground">Vendido</span><strong class="block tabular-nums">{{ formatMoney(soldValue()) }}</strong></div><div><span class="text-muted-foreground">Recebido</span><strong class="block tabular-nums">{{ formatMoney(consignmentReceived()) }}</strong></div><div><span class="text-muted-foreground">A repassar</span><strong class="block tabular-nums">{{ formatMoney(pendingConsignments()) }}</strong></div></div></section>
+  </div>
+
+  <p class="text-xs leading-5 text-muted-foreground">Os exemplos antigos marcados como recebidos não têm data e não entram nos gráficos do período. Os quadros de encomendas e consignação mostram o estado atual. Variação de caixa não é lucro líquido nem saldo bancário. Os dados novos desta prévia reiniciam ao recarregar.</p>
+</section>

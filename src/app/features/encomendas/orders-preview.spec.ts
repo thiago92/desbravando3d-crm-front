@@ -2,6 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { FilamentsPreview } from '../insumos/filaments-preview';
 import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
 import { ProductsPreview } from '../produtos/products-preview';
+import { ContactsPreview } from '../clientes-lojas/contacts-preview';
+import { FinishedProductsPreview } from '../produtos/finished-products-preview';
+import { CashLedgerPreview } from '../financeiro/cash-ledger-preview';
 import { orderColumn, OrdersPreview } from './orders-preview';
 
 describe('Regras de encomendas', () => {
@@ -48,6 +51,117 @@ describe('Regras de encomendas', () => {
     const second = service.create({ ...input, customer: 'Outra pessoa' });
     expect(second).toHaveProperty('saved');
     if ('saved' in second) expect(second.saved.number).toBe('#017');
+  });
+
+  it('vincula por ID o contato cadastrado e preserva nome livre quando não há cadastro', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const contacts = TestBed.inject(ContactsPreview);
+    const contact = contacts.create({ name: 'Cliente Vinculado', typeId: 'person', phone: null, whatsapp: null }, []);
+    expect(contact).toHaveProperty('saved');
+    if (!('saved' in contact)) return;
+    const input = { customer: 'Cliente Vinculado', items: [{ productId: 'preview-1', sizeId: 'vase-small', quantity: 1, marginId: 3 }], discountPercent: 0, deliveryDate: null };
+    expect(service.create(input)).toMatchObject({ saved: { customerId: contact.saved.id } });
+    expect(service.create({ ...input, customer: 'Cliente sem cadastro' })).toMatchObject({ saved: { customer: 'Cliente sem cadastro' } });
+    expect(service.create({ ...input, customerId: 'id-inexistente' })).toHaveProperty('error');
+  });
+
+  it('cancela orçamento sem baixar estoque, preserva o registro e impede confirmar depois', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const quote = service.orders().find((order) => order.number === '#013')!;
+    const quotePrice = service.priceFor(quote)?.total;
+    const before = inventory.filaments().map((filament) => filament.balanceGrams);
+    expect(service.cancelOrder(quote.id, 'Cliente desistiu')).toMatchObject({ saved: { cancelReason: 'Cliente desistiu', stage: 'request' } });
+    expect(service.orders().find((order) => order.id === quote.id)?.cancelledAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(service.cancelOrder(quote.id, '')).toHaveProperty('error');
+    expect(service.advance(quote.id, 'confirmed')).toHaveProperty('error');
+    expect(service.saveDiscount(quote.id, 10)).toHaveProperty('error');
+    const filament = inventory.filaments()[0];
+    inventory.save({ name: filament.name, material: filament.material, color: filament.color, pricePerKg: 200 }, { mode: 'add', grams: null }, filament.id);
+    expect(service.priceFor(service.orders().find((order) => order.id === quote.id)!)?.total).toBe(quotePrice);
+    expect(inventory.filaments().map((filament) => filament.balanceGrams)).toEqual(before);
+    const delivered = service.orders().find((order) => order.number === '#006')!;
+    expect(service.cancelOrder(delivered.id, '')).toHaveProperty('error');
+  });
+
+  it('estorna insumos de uma encomenda confirmada que ainda não iniciou impressão', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    const before = inventory.filaments().map((item) => item.balanceGrams);
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('saved');
+    expect(inventory.filaments().map((item) => item.balanceGrams)).not.toEqual(before);
+    expect(service.cancelOrder(order.id, '')).toHaveProperty('saved');
+    expect(inventory.filaments().map((item) => item.balanceGrams)).toEqual(before);
+    expect(service.pendingFor(service.orders().find((entry) => entry.id === order.id)!)).toBe(0);
+  });
+
+  it('devolve filamento e insumo por unidade ao cancelar antes da impressão', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const catalog = TestBed.inject(ProductsPreview);
+    const filaments = TestBed.inject(FilamentsPreview);
+    const supplies = TestBed.inject(UnitSuppliesPreview);
+    const created = supplies.save('Argola', 0.5, { mode: 'replace', units: 10 });
+    if (!('saved' in created)) throw new Error('Falha ao criar insumo de teste');
+    const product = catalog.products().find((entry) => entry.id === 'preview-1')!;
+    catalog.save({ ...product, sizes: product.sizes.map((size) => size.id === 'vase-small' ? { ...size, unitMaterials: [{ supplyId: created.saved.id, unitsPerUnit: 1 }] } : size) }, product.id);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    const before = filaments.filaments()[0].balanceGrams;
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('saved');
+    expect(filaments.filaments()[0].balanceGrams).toBe(before - 200);
+    expect(supplies.supplies()[0].balanceUnits).toBe(6);
+    expect(service.cancelOrder(order.id, '')).toHaveProperty('saved');
+    expect(filaments.filaments()[0].balanceGrams).toBe(before);
+    expect(supplies.supplies()[0].balanceUnits).toBe(10);
+  });
+
+  it('mantém consumo após impressão iniciada e põe peças prontas canceladas no estoque do produto', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const finished = TestBed.inject(FinishedProductsPreview);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('saved');
+    const afterConfirmation = inventory.filaments().map((item) => item.balanceGrams);
+    expect(service.advance(order.id, 'printing')).toHaveProperty('saved');
+    expect(service.cancelOrder(order.id, '')).toHaveProperty('saved');
+    expect(inventory.filaments().map((item) => item.balanceGrams)).toEqual(afterConfirmation);
+    expect(finished.quantity('preview-1')).toBe(0);
+    const ready = service.orders().find((entry) => entry.number === '#007')!;
+    expect(service.cancelOrder(ready.id, '')).toHaveProperty('saved');
+    expect(finished.quantity('preview-1', 'vase-small')).toBe(3);
+    expect(service.cancelOrder(ready.id, '')).toHaveProperty('error');
+    expect(finished.quantity('preview-1', 'vase-small')).toBe(3);
+  });
+
+  it('não coloca peça com falha ainda pendente no saldo de produto pronto ao cancelar', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const finished = TestBed.inject(FinishedProductsPreview);
+    const order = service.orders().find((entry) => entry.number === '#007')!;
+    expect(service.recordFailure(order.id, { date: '2026-11-16', itemIndex: 0, quantity: 1, reason: '', materials: [{ filamentId: 'filament-preview-1', grams: 10 }], hours: 1 })).toHaveProperty('saved');
+    expect(service.cancelOrder(order.id, '')).toHaveProperty('saved');
+    expect(finished.quantity('preview-1', 'vase-small')).toBe(2);
+  });
+
+  it('não credita produto pronto com parte ainda pendente de reimpressão', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const finished = TestBed.inject(FinishedProductsPreview);
+    const order = service.orders().find((entry) => entry.number === '#007')!;
+    expect(service.recordFailure(order.id, { date: '2026-11-16', itemIndex: 0, quantity: 0, materialMode: 'manual', reason: '', materials: [{ filamentId: 'filament-preview-1', grams: 10 }], hours: 1 })).toHaveProperty('saved');
+    expect(service.cancelOrder(order.id, '')).toHaveProperty('saved');
+    expect(finished.quantity('preview-1', 'vase-small')).toBe(0);
+  });
+
+  it('mantém a entrada recebida e encerra o saldo a cobrar ao cancelar', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const ledger = TestBed.inject(CashLedgerPreview);
+    const order = service.orders().find((entry) => entry.number === '#011')!;
+    expect(service.recordPayment(order.id, 5, '2026-11-16', 'Pix')).toHaveProperty('saved');
+    expect(service.cancelOrder(order.id, 'Cliente desistiu')).toHaveProperty('saved');
+    const cancelled = service.orders().find((entry) => entry.id === order.id)!;
+    expect(service.receivedFor(cancelled)).toBe(5);
+    expect(service.pendingFor(cancelled)).toBe(0);
+    expect(ledger.transactions()).toMatchObject([{ amount: 5, kind: 'receipt' }]);
+    expect(service.recordPayment(order.id, 1, '2026-11-16', 'Pix')).toHaveProperty('error');
   });
 
   it('aplica desconto apenas sobre a soma de todos os produtos', () => {
@@ -220,5 +334,41 @@ describe('Regras de encomendas', () => {
     expect(service.advance(id, 'ready')).toHaveProperty('saved');
     expect(service.advance(id, 'delivered')).toHaveProperty('saved');
     expect(service.orders().find((order) => order.id === id)?.payment).toBe('pending');
+  });
+
+  it('registra perda sem segunda baixa, exige reposição com saldo e preserva o preço e o caixa', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const order = service.orders().find((entry) => entry.number === '#013')!;
+    const balance = () => inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!.balanceGrams;
+    const initial = balance();
+    expect(service.advance(order.id, 'confirmed')).toHaveProperty('saved');
+    expect(service.advance(order.id, 'printing')).toHaveProperty('saved');
+    const afterConfirmation = balance();
+    const price = service.priceFor(service.orders().find((entry) => entry.id === order.id)!)!.total;
+    const failure = { date: '2026-11-16', itemIndex: 0, quantity: 1, reason: 'Peça soltou da mesa', materials: [{ filamentId: 'filament-preview-1', grams: 35 }], hours: 1.5 };
+    expect(service.recordFailure(order.id, failure)).toHaveProperty('saved');
+    expect(balance()).toBe(afterConfirmation);
+    expect(service.advance(order.id, 'ready')).toHaveProperty('error');
+    expect(service.recordFailure(order.id, failure)).toHaveProperty('error');
+    expect(service.startRetry(order.id, [{ filamentId: 'filament-preview-1', grams: 999 }])).toHaveProperty('error');
+    expect(balance()).toBe(afterConfirmation);
+    expect(service.startRetry(order.id, [{ filamentId: 'filament-preview-1', grams: 40 }])).toHaveProperty('saved');
+    expect(balance()).toBe(afterConfirmation - 40);
+    const updated = service.orders().find((entry) => entry.id === order.id)!;
+    expect(updated.failures).toMatchObject([{ quantity: 1, materialCost: 4.2, energyCost: 0.18, totalCost: 4.38 }]);
+    expect(service.priceFor(updated)?.total).toBe(price);
+    expect(service.receivedFor(updated)).toBe(0);
+    expect(service.advance(order.id, 'ready')).toHaveProperty('saved');
+    expect(balance()).toBe(initial - 240);
+  });
+
+  it('permite registrar falha quando pronta sem mudar a etapa e bloqueia a entrega até nova tentativa', () => {
+    const service = TestBed.inject(OrdersPreview);
+    const order = service.orders().find((entry) => entry.number === '#007')!;
+    expect(service.recordFailure(order.id, { date: '2026-11-16', itemIndex: 0, quantity: 1, reason: '', materials: [{ filamentId: 'filament-preview-1', grams: 10 }], hours: 1 })).toMatchObject({ saved: { stage: 'ready', retryPending: true } });
+    expect(service.advance(order.id, 'delivered')).toHaveProperty('error');
+    expect(service.startRetry(order.id, [{ filamentId: 'filament-preview-1', grams: 10 }])).toMatchObject({ saved: { stage: 'ready', retryPending: false } });
+    expect(service.advance(order.id, 'delivered')).toHaveProperty('saved');
   });
 });

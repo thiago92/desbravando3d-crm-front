@@ -16,6 +16,7 @@ import { ProductPreview, ProductSize, ProductsPreview } from '../produtos/produc
 import { formatMeasure, formatMoney, normalizeSearch } from '../../shared/utils/presentation';
 import { NewOrderPreview, OrderItemPreview, OrderPreview, OrdersPreview, nextOrderAction, orderColumn } from './orders-preview';
 import { HorizontalDragScroll } from '../../shared/directives/horizontal-drag-scroll';
+import { ContactsPreview } from '../clientes-lojas/contacts-preview';
 
 const stages: { id: OrderPreview['stage']; label: string }[] = [
   { id: 'request', label: 'Em orçamento' },
@@ -53,6 +54,7 @@ export class Encomendas {
   private readonly catalog = inject(ProductsPreview);
   private readonly inventory = inject(FilamentsPreview);
   private readonly unitInventory = inject(UnitSuppliesPreview);
+  protected readonly registeredContacts = inject(ContactsPreview).contacts;
   protected readonly margins = readPercentages();
   protected readonly query = signal('');
   protected readonly creating = signal(false);
@@ -71,6 +73,15 @@ export class Encomendas {
   protected readonly error = signal('');
   protected readonly notice = signal('');
   protected readonly advancing = signal(false);
+  protected failureItemIndex = 0;
+  protected failureQuantity = 1;
+  protected failureMaterialMode: 'whole' | 'manual' = 'whole';
+  protected failureDate = new Date().toLocaleDateString('en-CA');
+  protected failureReason = '';
+  protected cancelReason = '';
+  protected failureHours: number | null = null;
+  protected failureMaterials: { filamentId: string; grams: number | null }[] = [];
+  protected retryMaterials: { filamentId: string; grams: number | null }[] = [];
   protected discountValue = 0;
   protected deliveryDateValue = '';
   protected sizeDrafts: string[] = [];
@@ -83,18 +94,22 @@ export class Encomendas {
   protected readonly unitSupplies = this.unitInventory.supplies;
   protected readonly filteredOrders = computed(() => {
     const term = normalizeSearch(this.query().trim());
-    return this.preview.orders().filter((order) => normalizeSearch(`${order.number} ${order.customer}`).includes(term));
+    return this.preview.orders().filter((order) => !order.cancelledAt && normalizeSearch(`${order.number} ${order.customer}`).includes(term));
+  });
+  protected readonly cancelledOrders = computed(() => {
+    const term = normalizeSearch(this.query().trim());
+    return this.preview.orders().filter((order) => order.cancelledAt && normalizeSearch(`${order.number} ${order.customer}`).includes(term));
   });
   protected readonly columns = computed(() => stages.map((stage) => ({
     ...stage, orders: this.filteredOrders().filter((order) => orderColumn(order) === stage.id),
   })));
   protected readonly selectedStage = computed(() => {
     const order = this.selected();
-    return order ? stages.find((stage) => stage.id === orderColumn(order)) : undefined;
+    return order?.cancelledAt ? { id: 'request' as const, label: 'Cancelada' } : order ? stages.find((stage) => stage.id === orderColumn(order)) : undefined;
   });
   protected readonly action = computed(() => {
     const order = this.selected();
-    return order ? nextOrderAction[order.stage] : null;
+    return order && !order.cancelledAt ? nextOrderAction[order.stage] : null;
   });
   protected readonly money = formatMoney;
   protected readonly measure = formatMeasure;
@@ -303,7 +318,7 @@ export class Encomendas {
     const order = this.selected();
     const item = order?.items[index];
     const product = this.catalog.products().find((entry) => entry.id === item?.productId);
-    if (!order || order.stage !== 'request' || !item || !product || this.newSizeItemIndex() !== index) return;
+    if (!order || order.stage !== 'request' || order.cancelledAt || !item || !product || this.newSizeItemIndex() !== index) return;
     const draft = this.newSize;
     const positive = (value: number | null) => value !== null && Number.isFinite(value) && value > 0 && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < 0.000001;
     if (!draft.name.trim() || !positive(draft.heightCm) || !positive(draft.widthCm) || !positive(draft.depthCm) || !positive(draft.price) || !positive(draft.printHours)) {
@@ -371,7 +386,100 @@ export class Encomendas {
     this.error.set('');
     this.notice.set('');
     this.advancing.set(false);
+    this.cancelReason = '';
+    this.failureItemIndex = 0;
+    this.failureQuantity = 1;
+    this.failureMaterialMode = 'whole';
+    this.failureDate = new Date().toLocaleDateString('en-CA');
+    this.failureReason = '';
+    this.resetFailureEstimate(order);
+    this.retryMaterials = (order.failures?.at(-1)?.materials ?? []).map((line) => ({ filamentId: line.filamentId, grams: line.grams }));
     this.dialog?.open();
+  }
+
+  protected resetFailureEstimate(order: OrderPreview): void {
+    const item = order.items[this.failureItemIndex];
+    const size = item ? this.sizeFor(item) : null;
+    this.failureHours = size ? Math.round(size.printHours * this.failureQuantity * 100) / 100 : null;
+    this.failureMaterials = [{ filamentId: '', grams: null }];
+  }
+
+  protected failureItemChanged(): void {
+    const order = this.selected();
+    if (!order || !order.items[this.failureItemIndex]) return;
+    this.failureQuantity = 1;
+    this.resetFailureEstimate(order);
+  }
+
+  protected failureQuantityChanged(): void {
+    const order = this.selected();
+    const item = order?.items[this.failureItemIndex];
+    const size = item ? this.sizeFor(item) : null;
+    if (size && this.failureMaterialMode === 'whole') this.failureHours = Math.round(size.printHours * this.failureQuantity * 100) / 100;
+  }
+
+  protected setFailureMaterialMode(mode: 'whole' | 'manual'): void {
+    this.failureMaterialMode = mode;
+    if (mode === 'manual') {
+      this.failureMaterials = [{ filamentId: '', grams: null }];
+      this.failureHours = null;
+    } else {
+      const order = this.selected();
+      if (order) this.failureQuantityChanged();
+    }
+  }
+
+  protected failureEstimatedMaterials(): { filamentId: string; grams: number }[] {
+    const order = this.selected();
+    const item = order?.items[this.failureItemIndex];
+    const size = item ? this.sizeFor(item) : null;
+    return size?.materials.map((line) => ({ filamentId: line.filamentId, grams: Math.round(line.gramsPerUnit * this.failureQuantity * 100) / 100 })) ?? [];
+  }
+
+  protected addFailureMaterial(): void { this.failureMaterials.push({ filamentId: '', grams: null }); }
+  protected removeFailureMaterial(index: number): void { this.failureMaterials.splice(index, 1); }
+  protected addRetryMaterial(): void { this.retryMaterials.push({ filamentId: '', grams: null }); }
+  protected removeRetryMaterial(index: number): void { this.retryMaterials.splice(index, 1); }
+
+  protected recordFailure(): void {
+    const order = this.selected();
+    if (!order) return;
+    const materials = this.failureMaterialMode === 'whole' ? this.failureEstimatedMaterials() : this.failureMaterials.map((line) => ({ filamentId: line.filamentId, grams: line.grams! }));
+    if (this.failureMaterialMode === 'whole' && !materials.length) { this.error.set('Cadastre o consumo de filamento no tamanho do produto ou informe a perda manualmente.'); return; }
+    const result = this.preview.recordFailure(order.id, {
+      date: this.failureDate, itemIndex: Number(this.failureItemIndex), quantity: this.failureMaterialMode === 'whole' ? this.failureQuantity : 0,
+      reason: this.failureReason, hours: this.failureHours!, materialMode: this.failureMaterialMode,
+      materials,
+    });
+    if ('error' in result) { this.error.set(result.error); return; }
+    this.retryMaterials = materials.map((line) => ({ ...line }));
+    this.failureReason = '';
+    this.error.set('');
+    this.notice.set('Falha registrada. Informe o material da nova tentativa antes de continuar.');
+  }
+
+  protected startRetry(): void {
+    const order = this.selected();
+    if (!order) return;
+    const result = this.preview.startRetry(order.id, this.retryMaterials.map((line) => ({ filamentId: line.filamentId, grams: line.grams! })));
+    if ('error' in result) { this.error.set(result.error); return; }
+    this.error.set('');
+    this.notice.set('Nova tentativa iniciada e material adicional baixado do estoque.');
+  }
+
+  protected cancelOrder(): void {
+    const order = this.selected();
+    if (!order) return;
+    const result = this.preview.cancelOrder(order.id, this.cancelReason);
+    if ('error' in result) { this.error.set(result.error); return; }
+    this.error.set('');
+    this.notice.set(`Encomenda ${order.number} cancelada. Ela permanece consultável abaixo do quadro.`);
+    this.advancing.set(true);
+    this.close();
+  }
+
+  protected stageAtCancellation(order: OrderPreview): string {
+    return stages.find((stage) => stage.id === order.stage)?.label ?? '';
   }
 
   protected saveDiscount(): void {

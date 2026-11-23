@@ -1,49 +1,33 @@
-<main class="login-shell min-h-dvh lg:grid lg:grid-cols-2">
-  <section class="brand-panel relative isolate flex min-h-[24rem] flex-col overflow-hidden px-7 py-8 text-white sm:px-10 lg:min-h-dvh lg:px-14 lg:py-12">
+<main class="login-shell min-h-dvh lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(28rem,0.95fr)]">
+  <section class="brand-panel relative isolate flex flex-col overflow-hidden px-6 py-7 text-white sm:px-10 lg:min-h-dvh lg:px-14 lg:py-12">
     <div class="brand-glow brand-glow-pink" aria-hidden="true"></div>
     <div class="brand-glow brand-glow-blue" aria-hidden="true"></div>
     <div class="brand-grid" aria-hidden="true"></div>
-
-    <div class="relative z-10 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-white/65">
-      <span class="brand-mark flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white" aria-hidden="true">D</span>
+    <div class="relative z-10 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+      <img src="/brand/fiveicon.png" width="36" height="36" alt="" class="size-9 object-contain" />
       Área de gestão
     </div>
-
-    <div class="relative z-10 mx-auto flex w-full max-w-[38rem] flex-1 flex-col justify-center py-10 lg:py-16">
-      <img
-        class="brand-logo mx-auto w-full max-w-[34rem]"
-        src="/brand/logo.jpg"
-        alt="Desbravando 3D — Impressão 3D e encomendas sob medida"
-      />
-      <div class="mt-5 max-w-[32rem] lg:mt-8">
+    <div class="relative z-10 mx-auto flex w-full max-w-[40rem] flex-1 flex-col justify-center py-8 lg:py-16">
+      <img class="brand-logo w-full" src="/brand/logoNova.png" alt="Desbravando 3D CRM" />
+      <div class="mt-5 max-w-[34rem] lg:mt-8">
         <div class="mb-5 h-1 w-16 rounded-full bg-gradient-to-r from-fuchsia-400 via-violet-400 to-sky-400"></div>
-        <h1 class="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl xl:text-[2.7rem]">
-          Da ideia à entrega, tudo em um só lugar.
-        </h1>
-        <p class="mt-4 max-w-[30rem] text-sm leading-7 text-violet-100/70 sm:text-base">
-          Um espaço para acompanhar encomendas, consignações e pagamentos com clareza em cada etapa.
-        </p>
+        <h1 class="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl xl:text-4xl">Sua operação, do orçamento ao recebimento.</h1>
+        <p class="mt-4 max-w-[31rem] text-sm leading-7 text-violet-100/75 sm:text-base">Acompanhe encomendas, consignações, estoque e financeiro em um só lugar.</p>
       </div>
     </div>
-
-    <p class="relative z-10 text-xs tracking-wide text-white/40">Desbravando 3D · Gestão feita para criar</p>
+    <p class="relative z-10 hidden text-xs tracking-wide text-white/50 lg:block">Desbravando 3D · CRM</p>
   </section>
-
-  <section class="form-panel flex min-h-[38rem] items-center justify-center px-6 py-14 sm:px-10 lg:min-h-dvh lg:px-14">
+  <section class="form-panel flex items-center justify-center px-6 py-12 sm:px-10 lg:min-h-dvh lg:px-14">
     <div class="w-full max-w-[27rem]">
-      <div class="mb-10 flex items-center justify-between gap-4">
+      <div class="mb-9 flex items-center justify-between gap-4">
         <div class="flex items-center gap-2.5">
-          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-sm font-bold text-violet-700" aria-hidden="true">D</span>
+          <img src="/brand/fiveicon.png" width="36" height="36" alt="" class="size-9 object-contain" />
           <span class="text-sm font-semibold tracking-tight text-slate-800">Desbravando 3D</span>
         </div>
-        <span class="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-violet-700">CRM</span>
+        <span class="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-violet-700">Prévia</span>
       </div>
-
       <router-outlet />
-
-      <p class="mt-10 border-t border-slate-100 pt-6 text-center text-xs leading-5 text-slate-400">
-        Prévia aberta para definição das telas do CRM.
-      </p>
+      <p class="mt-10 border-t border-slate-200 pt-6 text-center text-xs leading-5 text-slate-500">Telas de acesso em prévia. A autenticação será integrada ao backend.</p>
     </div>
   </section>
 </main>

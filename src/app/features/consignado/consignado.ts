@@ -16,12 +16,14 @@ import { ProductsPreview, type ProductSize } from '../produtos/products-preview'
 import { ContactsPreview } from '../clientes-lojas/contacts-preview';
 import { HorizontalDragScroll } from '../../shared/directives/horizontal-drag-scroll';
 import { formatMoney, normalizeSearch } from '../../shared/utils/presentation';
+import { CashLedgerPreview, type PaymentMethodPreview, validCashDate, validMoney } from '../financeiro/cash-ledger-preview';
 
 type ColumnId = 'quote' | 'confirmed' | 'printing' | 'ready' | 'with-store' | 'awaiting-settlement' | 'partial-settlement' | 'partially-returned' | 'settled' | 'returned';
 type OperationalStage = 'quote' | 'confirmed' | 'printing' | 'ready' | 'with-store';
 type PreviewCard = {
   number: string;
   store: string;
+  contactId?: string;
   product: string;
   productId?: string;
   sizeId?: string;
@@ -35,7 +37,19 @@ type PreviewCard = {
 };
 type FilamentConsumption = { filamentId: string; grams: number };
 type ConsumptionDraft = { enabled: boolean; lines: { filamentId: string; grams: number | null }[] };
-export type Consignment = Omit<PreviewCard, 'column'> & { stage: OperationalStage; filamentConsumptionOverride?: FilamentConsumption[] | null; stockConsumption?: FilamentConsumption[] };
+export type Consignment = Omit<PreviewCard, 'column'> & { stage: OperationalStage; filamentConsumptionOverride?: FilamentConsumption[] | null; stockConsumption?: FilamentConsumption[]; failures?: ConsignmentFailurePreview[]; retryPending?: boolean };
+export type ConsignmentFailurePreview = {
+  id: string;
+  materialMode: 'whole' | 'manual';
+  date: string;
+  quantity: number;
+  reason: string;
+  materials: { filamentId: string; grams: number; pricePerKg: number }[];
+  hours: number;
+  materialCost: number;
+  energyCost: number;
+  totalCost: number;
+};
 
 const stages: { id: ColumnId; label: string }[] = [
   { id: 'quote', label: 'Em orçamento' },
@@ -100,6 +114,11 @@ function initialStage(column: ColumnId): OperationalStage {
 }
 
 function cents(value: number): number { return Math.round((value + Number.EPSILON) * 100) / 100; }
+function validHundredth(value: number): boolean { return Number.isFinite(value) && value >= 0 && Number.isSafeInteger(Math.round(value * 100)) && Math.abs(value * 100 - Math.round(value * 100)) < 0.000001; }
+function todayDate(): string {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 function visualColumn(card: Consignment): ColumnId {
   if (card.stage !== 'with-store') return card.stage;
@@ -118,11 +137,53 @@ export function consignmentStatus(card: Consignment): string {
 
 @Injectable({ providedIn: 'root' })
 export class ConsignmentsPreview {
+  private readonly cashLedger = inject(CashLedgerPreview);
+  private readonly inventory = inject(FilamentsPreview);
   readonly entries = signal<Consignment[]>(examples.map(({ column, ...card }) => ({
     ...card,
     stage: initialStage(column),
-    ...(column === 'quote' ? { productId: exampleProductIds.get(card.product), sizeId: exampleSizeIds.get(card.product) } : {}),
+    productId: exampleProductIds.get(card.product), sizeId: exampleSizeIds.get(card.product),
   })));
+
+  recordFailure(number: string, input: { date: string; quantity: number; reason: string; materialMode?: 'whole' | 'manual'; materials: { filamentId: string; grams: number }[]; hours: number }): { saved: Consignment } | { error: string } {
+    const card = this.entries().find((entry) => entry.number === number);
+    if (!card || (card.stage !== 'printing' && card.stage !== 'ready') || card.retryPending) return { error: 'Registre a falha apenas durante uma tentativa ativa, em impressão ou pronta para entrega.' };
+    if (!Number.isSafeInteger(input.quantity) || (input.materialMode === 'manual' ? input.quantity !== 0 : input.quantity < 1 || input.quantity > card.quantity)) return { error: 'Informe uma quantidade válida de peças perdidas.' };
+    if (!validCashDate(input.date)) return { error: 'Informe uma data válida para a falha.' };
+    if (!validHundredth(input.hours) || input.hours <= 0) return { error: 'Informe horas gastas maiores que zero, com até duas casas decimais.' };
+    if (!input.materials.length || input.materials.some((line) => !this.inventory.filaments().some((filament) => filament.id === line.filamentId) || !validHundredth(line.grams) || line.grams <= 0) || new Set(input.materials.map((line) => line.filamentId)).size !== input.materials.length) return { error: 'Informe filamentos distintos e gramas positivas, com até duas casas decimais.' };
+    const materials = input.materials.map((line) => ({ ...line, pricePerKg: this.inventory.filaments().find((filament) => filament.id === line.filamentId)!.pricePerKg }));
+    const materialCost = cents(materials.reduce((sum, line) => sum + line.grams * line.pricePerKg / 1000, 0));
+    const energy = latestEnergySetting();
+    const energyCost = cents((energy?.averagePowerW ?? 0) / 1000 * input.hours * (energy?.tariffPerKwh ?? 0));
+    const failure: ConsignmentFailurePreview = { id: crypto.randomUUID(), materialMode: input.materialMode ?? 'whole', date: input.date, quantity: input.quantity, reason: input.reason.trim().slice(0, 500), materials, hours: input.hours, materialCost, energyCost, totalCost: cents(materialCost + energyCost) };
+    const saved = { ...card, failures: [...(card.failures ?? []), failure], retryPending: true };
+    this.entries.update((items) => items.map((entry) => entry.number === number ? saved : entry));
+    return { saved };
+  }
+
+  startRetry(number: string, materials: { filamentId: string; grams: number }[]): { saved: Consignment } | { error: string } {
+    const card = this.entries().find((entry) => entry.number === number);
+    if (!card || (card.stage !== 'printing' && card.stage !== 'ready') || !card.retryPending) return { error: 'Registre uma falha antes de iniciar nova tentativa.' };
+    if (!materials.length || materials.some((line) => !validHundredth(line.grams) || line.grams <= 0) || new Set(materials.map((line) => line.filamentId)).size !== materials.length) return { error: 'Informe filamentos distintos e gramas positivas para a nova tentativa.' };
+    const result = this.inventory.consume(new Map(materials.map((line) => [line.filamentId, line.grams])));
+    if ('error' in result) return result;
+    const saved = { ...card, retryPending: false };
+    this.entries.update((items) => items.map((entry) => entry.number === number ? saved : entry));
+    return { saved };
+  }
+
+  recordPayment(number: string, amount: number, date: string, method: PaymentMethodPreview, note = ''): { saved: Consignment } | { error: string } {
+    const card = this.entries().find((entry) => entry.number === number);
+    if (!card || card.stage !== 'with-store') return { error: 'O recebimento só pode ser registrado após a entrega ao cliente.' };
+    const pending = cents(card.sold * card.unitPrice - card.received);
+    if (!validMoney(amount) || amount > pending) return { error: `Informe um valor maior que zero e até ${formatMoney(pending)}, com duas casas decimais.` };
+    const receipt = this.cashLedger.addReceipt({ date, amount, origin: 'consignment', reference: card.number, party: card.store, method, note });
+    if ('error' in receipt) return receipt;
+    const saved = { ...card, received: cents(card.received + amount) };
+    this.entries.update((items) => items.map((entry) => entry.number === number ? saved : entry));
+    return { saved };
+  }
 }
 
 @Component({
@@ -155,7 +216,8 @@ export class Consignado {
   protected createMarginId: number | null = null;
   protected readonly createError = signal('');
   protected consumptionDraft: ConsumptionDraft = { enabled: false, lines: [] };
-  private readonly entries = inject(ConsignmentsPreview).entries;
+  private readonly consignments = inject(ConsignmentsPreview);
+  private readonly entries = this.consignments.entries;
   protected readonly query = signal('');
   private readonly selectedNumber = signal<string | null>(null);
   protected readonly selected = computed(() => this.entries().find((card) => card.number === this.selectedNumber()) ?? null);
@@ -168,6 +230,15 @@ export class Consignado {
   protected saleQuantity: number | null = null;
   protected returnQuantity: number | null = null;
   protected paymentAmount: number | null = null;
+  protected paymentDate = todayDate();
+  protected paymentMethod: PaymentMethodPreview = 'Não informado';
+  protected failureQuantity = 1;
+  protected failureMaterialMode: 'whole' | 'manual' = 'whole';
+  protected failureDate = todayDate();
+  protected failureReason = '';
+  protected failureHours: number | null = null;
+  protected failureMaterials: { filamentId: string; grams: number | null }[] = [];
+  protected retryMaterials: { filamentId: string; grams: number | null }[] = [];
   protected readonly filtered = computed(() => {
     const term = normalizeSearch(this.query().trim());
     return this.entries().filter((card) => normalizeSearch(`${card.number} ${card.store} ${card.product}`).includes(term));
@@ -244,7 +315,8 @@ export class Consignado {
     const price = this.createPrice();
     if (!price) { this.createError.set('Não foi possível calcular o preço. Confira o tamanho, os filamentos e a energia cadastrados.'); return; }
     const nextNumber = Math.max(0, ...this.entries().map((card) => Number(card.number.replace(/^#C-/, '')) || 0)) + 1;
-    const card: Consignment = { number: `#C-${String(nextNumber).padStart(3, '0')}`, store: this.createStore, product: product.name, productId: product.id, sizeId: this.createSizeId, marginId: this.createMarginId!, stage: 'quote', quantity: this.createQuantity, sold: 0, returned: 0, unitPrice: price.unitPrice, received: 0 };
+    const contact = this.contacts.contacts().find((entry) => normalizeSearch(entry.name) === normalizeSearch(this.createStore));
+    const card: Consignment = { number: `#C-${String(nextNumber).padStart(3, '0')}`, store: this.createStore, contactId: contact?.id, product: product.name, productId: product.id, sizeId: this.createSizeId, marginId: this.createMarginId!, stage: 'quote', quantity: this.createQuantity, sold: 0, returned: 0, unitPrice: price.unitPrice, received: 0 };
     this.entries.update((items) => [...items, card]);
     this.query.set('');
     this.selectedNumber.set(card.number);
@@ -260,6 +332,14 @@ export class Consignado {
     this.error.set('');
     this.notice.set('');
     this.columnChanged = false;
+    this.failureQuantity = 1;
+    this.failureMaterialMode = 'whole';
+    this.failureDate = todayDate();
+    this.failureReason = '';
+    const size = this.sizeFor(card);
+    this.failureHours = size?.printHours ?? null;
+    this.failureMaterials = [{ filamentId: '', grams: null }];
+    this.retryMaterials = (card.failures?.at(-1)?.materials ?? []).map((line) => ({ filamentId: line.filamentId, grams: line.grams }));
     this.detailsDialog?.open();
   }
   protected close(): void { this.detailsDialog?.close(); }
@@ -267,6 +347,8 @@ export class Consignado {
     this.selectedNumber.set(null);
     this.creating.set(false);
     this.saleQuantity = this.returnQuantity = this.paymentAmount = null;
+    this.paymentDate = todayDate();
+    this.paymentMethod = 'Não informado';
     if (this.columnChanged) this.board?.nativeElement.focus({ preventScroll: true });
   }
   protected productImage(card: Consignment): string | null {
@@ -289,6 +371,7 @@ export class Consignado {
     const card = this.selected();
     const action = card && nextAction[card.stage];
     if (!card || !action) return;
+    if (card.retryPending) { this.error.set('Inicie uma nova tentativa antes de avançar a consignação.'); return; }
     if (action.target === 'confirmed' && card.productId && card.sizeId) {
       if (this.consumptionChanged(card)) { this.error.set('Salve o consumo real antes de confirmar a consignação.'); return; }
       const size = this.catalog.products().find((product) => product.id === card.productId)?.sizes.find((entry) => entry.id === card.sizeId);
@@ -312,6 +395,51 @@ export class Consignado {
       return;
     }
     this.update({ ...card, stage: action.target }, `${action.label} registrada nesta prévia.`);
+  }
+
+  protected addFailureMaterial(): void { this.failureMaterials.push({ filamentId: '', grams: null }); }
+  protected failureQuantityChanged(): void {
+    const card = this.selected();
+    const size = card && this.sizeFor(card);
+    if (size && this.failureMaterialMode === 'whole') this.failureHours = Math.round(size.printHours * this.failureQuantity * 100) / 100;
+  }
+  protected setFailureMaterialMode(mode: 'whole' | 'manual'): void {
+    this.failureMaterialMode = mode;
+    if (mode === 'manual') {
+      this.failureMaterials = [{ filamentId: '', grams: null }];
+      this.failureHours = null;
+    } else this.failureQuantityChanged();
+  }
+  protected failureEstimatedMaterials(): { filamentId: string; grams: number }[] {
+    const card = this.selected();
+    const size = card && this.sizeFor(card);
+    return size?.materials.map((line) => ({ filamentId: line.filamentId, grams: Math.round(line.gramsPerUnit * this.failureQuantity * 100) / 100 })) ?? [];
+  }
+  protected removeFailureMaterial(index: number): void { this.failureMaterials.splice(index, 1); }
+  protected addRetryMaterial(): void { this.retryMaterials.push({ filamentId: '', grams: null }); }
+  protected removeRetryMaterial(index: number): void { this.retryMaterials.splice(index, 1); }
+  protected recordFailure(): void {
+    const card = this.selected();
+    if (!card) return;
+    const materials = this.failureMaterialMode === 'whole' ? this.failureEstimatedMaterials() : this.failureMaterials.map((line) => ({ filamentId: line.filamentId, grams: line.grams! }));
+    if (this.failureMaterialMode === 'whole' && !materials.length) { this.error.set('Cadastre o consumo de filamento no tamanho do produto ou informe a perda manualmente.'); return; }
+    const result = this.consignments.recordFailure(card.number, {
+      date: this.failureDate, quantity: this.failureMaterialMode === 'whole' ? this.failureQuantity : 0, reason: this.failureReason, hours: this.failureHours!, materialMode: this.failureMaterialMode,
+      materials,
+    });
+    if ('error' in result) { this.error.set(result.error); return; }
+    this.retryMaterials = materials.map((line) => ({ ...line }));
+    this.failureReason = '';
+    this.error.set('');
+    this.notice.set('Falha registrada. Informe o material da nova tentativa.');
+  }
+  protected startRetry(): void {
+    const card = this.selected();
+    if (!card) return;
+    const result = this.consignments.startRetry(card.number, this.retryMaterials.map((line) => ({ filamentId: line.filamentId, grams: line.grams! })));
+    if ('error' in result) { this.error.set(result.error); return; }
+    this.error.set('');
+    this.notice.set('Nova tentativa iniciada e material adicional baixado do estoque.');
   }
 
   protected recordSale(): void {
@@ -342,13 +470,12 @@ export class Consignado {
     const card = this.selected();
     const amount = this.paymentAmount;
     if (!card || card.stage !== 'with-store') return;
-    const pending = this.pending(card);
-    if (amount === null || !Number.isFinite(amount) || amount <= 0 || cents(amount) !== amount || amount > pending) {
-      this.error.set(`Informe um valor maior que zero e até ${this.money(pending)}, com duas casas decimais.`);
-      return;
-    }
+    const result = this.consignments.recordPayment(card.number, amount ?? NaN, this.paymentDate, this.paymentMethod);
+    if ('error' in result) { this.error.set(result.error); return; }
+    if (visualColumn(card) !== visualColumn(result.saved)) this.columnChanged = true;
     this.paymentAmount = null;
-    this.update({ ...card, received: cents(card.received + amount) }, `Recebimento de ${this.money(amount)} registrado.`);
+    this.error.set('');
+    this.notice.set(`Recebimento de ${this.money(amount!)} registrado.`);
   }
 
   private update(card: Consignment, notice: string): void {

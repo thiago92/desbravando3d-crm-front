@@ -11,7 +11,7 @@ describe('Login', () => {
     }).compileComponents();
   });
 
-  it('opens the internal preview without credentials', async () => {
+  it('validates the login fields and opens the internal preview', async () => {
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
 
@@ -21,10 +21,20 @@ describe('Login', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('#email')).toBeNull();
-    expect(compiled.querySelector('#password')).toBeNull();
+    const form = compiled.querySelector('form') as HTMLFormElement;
+    const email = compiled.querySelector('#email') as HTMLInputElement;
+    const password = compiled.querySelector('#password') as HTMLInputElement;
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    expect(compiled.textContent).toContain('Informe seu e-mail.');
+    expect(compiled.textContent).toContain('Informe sua senha.');
+    expect(router.url).toBe('/login');
 
-    (compiled.querySelector('a[href="/inicio"]') as HTMLAnchorElement).click();
+    email.value = 'usuario@exemplo.com';
+    email.dispatchEvent(new Event('input', { bubbles: true }));
+    password.value = 'qualquer-senha';
+    password.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await fixture.whenStable();
     fixture.detectChanges();
 

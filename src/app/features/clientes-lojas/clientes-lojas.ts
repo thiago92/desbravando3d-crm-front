@@ -54,11 +54,11 @@ export class ClientesLojas {
   protected readonly selected = computed(() => this.contacts().find((contact) => contact.id === this.selectedId()) ?? null);
   protected readonly contactOrders = computed(() => {
     const contact = this.selected();
-    return contact ? this.orders.orders().filter((order) => order.customer.trim() === contact.name) : [];
+    return contact ? this.orders.orders().filter((order) => order.customerId ? order.customerId === contact.id : order.customer.trim() === contact.name) : [];
   });
   protected readonly contactConsignments = computed(() => {
     const contact = this.selected();
-    return contact ? this.consignments.entries().filter((card) => card.store.trim() === contact.name) : [];
+    return contact ? this.consignments.entries().filter((card) => card.contactId ? card.contactId === contact.id : card.store.trim() === contact.name) : [];
   });
   protected typeNameFor(id: string): string { return this.types().find((type) => type.id === id)?.name ?? 'Tipo indisponível'; }
   protected readonly money = formatMoney;

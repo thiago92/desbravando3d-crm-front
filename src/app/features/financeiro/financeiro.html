@@ -1,0 +1,81 @@
+<section class="mx-auto max-w-7xl space-y-6">
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Prévia do CRM</p>
+      <h1 class="mt-3 text-3xl font-semibold tracking-tight">Financeiro</h1>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Acompanhe cobranças, recebimentos e despesas. Os lançamentos desta prévia ficam apenas nesta visita.</p>
+    </div>
+    <button hlmBtn type="button" (click)="openExpense()">+ Registrar despesa</button>
+  </header>
+
+  <div class="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4">
+    <div><label for="finance-from" class="text-sm font-medium">De</label><input hlmInput id="finance-from" type="date" class="mt-2" [ngModel]="from()" (ngModelChange)="from.set($event)" /></div>
+    <div><label for="finance-to" class="text-sm font-medium">Até</label><input hlmInput id="finance-to" type="date" class="mt-2" [ngModel]="to()" (ngModelChange)="to.set($event)" /></div>
+    <p class="pb-2 text-xs text-muted-foreground">O período filtra recebimentos e despesas. “A receber” mostra o saldo pendente agora.</p>
+  </div>
+  @if (!validPeriod()) { <p role="alert" class="text-sm text-destructive">Escolha um período válido: a data inicial deve ser anterior ou igual à final.</p> }
+
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo financeiro">
+    <div class="rounded-2xl border border-border bg-card p-5"><p class="text-sm text-muted-foreground">Recebido no período</p><p class="mt-3 text-2xl font-semibold tabular-nums">{{ money(receivedInPeriod()) }}</p></div>
+    <div class="rounded-2xl border border-border bg-card p-5"><p class="text-sm text-muted-foreground">Pago no período</p><p class="mt-3 text-2xl font-semibold tabular-nums">{{ money(paidInPeriod()) }}</p></div>
+    <div class="rounded-2xl border border-border bg-card p-5"><p class="text-sm text-muted-foreground">Variação de caixa</p><p class="mt-3 text-2xl font-semibold tabular-nums">{{ money(cashChange()) }}</p><p class="mt-1 text-xs text-muted-foreground">Recebido menos pago no período</p></div>
+    <div class="rounded-2xl border border-border bg-card p-5"><p class="text-sm text-muted-foreground">A receber agora</p><p class="mt-3 text-2xl font-semibold tabular-nums">{{ money(pendingTotal()) }}</p><p class="mt-1 text-xs text-muted-foreground">Encomendas confirmadas e vendas consignadas pendentes</p></div>
+  </div>
+  <p class="text-xs leading-5 text-muted-foreground">Os exemplos antigos com pagamento recebido não têm data de recebimento e, por isso, não entram no resumo do período. Variação de caixa não representa lucro líquido nem saldo bancário.</p>
+  @if (notice()) { <p role="status" class="rounded-lg border border-border bg-secondary p-3 text-sm">{{ notice() }}</p> }
+
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <hlm-toggle-group type="single" variant="outline" [nullable]="false" [value]="view()" (valueChange)="setView($event)" aria-label="Visão do financeiro" class="flex-wrap">
+      <button hlmToggleGroupItem value="receivables">Contas a receber</button>
+      <button hlmToggleGroupItem value="transactions">Movimentações</button>
+      <button hlmToggleGroupItem value="expenses">Despesas</button>
+    </hlm-toggle-group>
+    <div class="w-full sm:w-72"><label for="finance-search" class="text-sm font-medium">Buscar</label><input hlmInput id="finance-search" type="search" class="mt-2" [placeholder]="view() === 'receivables' ? 'Cliente ou número' : 'Descrição, origem ou número'" [ngModel]="search()" (ngModelChange)="search.set($event)" /></div>
+  </div>
+
+  @if (view() === 'receivables') {
+    <div><h2 class="text-lg font-semibold">Contas a receber</h2><p class="mt-1 text-sm text-muted-foreground">Orçamentos ainda não confirmados ficam fora desta lista. No consignado, somente unidades vendidas geram cobrança.</p></div>
+    @if (visibleReceivables().length) {
+      <div hlmTableContainer class="rounded-2xl border border-border bg-card"><table hlmTable><thead hlmTHead class="bg-muted/50"><tr hlmTr><th hlmTh scope="col" class="px-4 py-3">Origem</th><th hlmTh scope="col" class="px-4 py-3">Cliente</th><th hlmTh scope="col" class="px-4 py-3">Registro</th><th hlmTh scope="col" class="px-4 py-3 text-right">Valor devido</th><th hlmTh scope="col" class="px-4 py-3 text-right">Recebido</th><th hlmTh scope="col" class="px-4 py-3 text-right">Pendente</th><th hlmTh scope="col" class="px-4 py-3 text-right">Ações</th></tr></thead><tbody hlmTBody>
+        @for (row of visibleReceivables(); track row.kind + row.id) { <tr hlmTr><td hlmTd class="px-4 py-4">{{ row.description }}</td><td hlmTd class="px-4 py-4 font-medium">{{ row.party }}</td><td hlmTd class="px-4 py-4">{{ row.reference }}</td><td hlmTd class="px-4 py-4 text-right tabular-nums">{{ money(row.total) }}</td><td hlmTd class="px-4 py-4 text-right tabular-nums">{{ money(row.received) }}</td><td hlmTd class="px-4 py-4 text-right font-semibold tabular-nums">{{ money(row.pending) }}</td><td hlmTd class="px-4 py-4"><div class="flex justify-end gap-2"><button hlmBtn variant="outline" size="sm" type="button" (click)="openSource(row)" [attr.aria-label]="'Abrir ' + row.description + ' ' + row.reference">Abrir</button><button hlmBtn size="sm" type="button" (click)="openReceipt(row)" [attr.aria-label]="'Registrar recebimento de ' + row.reference">Receber</button></div></td></tr> }
+      </tbody></table></div>
+    } @else { <div class="rounded-2xl border border-dashed border-border p-8 text-sm text-muted-foreground">Nenhuma cobrança pendente encontrada.</div> }
+  } @else {
+    <div><h2 class="text-lg font-semibold">{{ view() === 'expenses' ? 'Despesas' : 'Movimentações' }}</h2><p class="mt-1 text-sm text-muted-foreground">Lançamentos com data dentro do período escolhido.</p></div>
+    @if (visibleTransactions().length) {
+      <div hlmTableContainer class="rounded-2xl border border-border bg-card"><table hlmTable><thead hlmTHead class="bg-muted/50"><tr hlmTr><th hlmTh scope="col" class="px-4 py-3">Data</th><th hlmTh scope="col" class="px-4 py-3">Tipo</th><th hlmTh scope="col" class="px-4 py-3">Descrição</th><th hlmTh scope="col" class="px-4 py-3">Origem / categoria</th><th hlmTh scope="col" class="px-4 py-3">Referência</th><th hlmTh scope="col" class="px-4 py-3">Forma</th><th hlmTh scope="col" class="px-4 py-3 text-right">Valor</th></tr></thead><tbody hlmTBody>
+        @for (entry of visibleTransactions(); track entry.id) { <tr hlmTr><td hlmTd class="px-4 py-4 tabular-nums">{{ date(entry.date) }}</td><td hlmTd class="px-4 py-4">{{ entry.kind === 'receipt' ? 'Entrada' : 'Saída' }}</td><td hlmTd class="px-4 py-4"><span class="font-medium">{{ entry.description }}</span>@if (entry.party) { <span class="block text-xs text-muted-foreground">{{ entry.party }}</span> }@if (entry.purchase; as purchase) { <span class="block text-xs text-muted-foreground">{{ purchase.quantityGrams / 1000 }} kg · {{ money(purchase.pricePerKg) }}/kg</span> }@if (entry.note) { <span class="block text-xs text-muted-foreground">{{ entry.note }}</span> }</td><td hlmTd class="px-4 py-4">{{ origin(entry) }}</td><td hlmTd class="px-4 py-4">{{ entry.reference ?? '—' }}</td><td hlmTd class="px-4 py-4">{{ entry.method }}</td><td hlmTd class="px-4 py-4 text-right font-semibold tabular-nums">{{ entry.kind === 'expense' ? '−' : '+' }} {{ money(entry.amount) }}</td></tr> }
+      </tbody></table></div>
+    } @else { <div class="rounded-2xl border border-dashed border-border p-8 text-sm text-muted-foreground">Nenhum lançamento encontrado neste período. Registre um recebimento ou uma despesa para começar.</div> }
+  }
+
+  <hlm-dialog #receiptDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar recebimento" class="max-h-[90dvh] w-[min(94vw,560px)] max-w-none overflow-auto sm:max-w-none">
+      @if (selectedReceivable(); as row) {
+        <hlm-dialog-header><h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Registrar recebimento</h2><p hlmDialogDescription class="text-sm text-muted-foreground">{{ row.description }} {{ row.reference }} · {{ row.party }}</p></hlm-dialog-header>
+        <p class="rounded-lg bg-muted/50 p-3 text-sm">Pendente agora: <strong>{{ money(row.pending) }}</strong></p>
+        <form class="space-y-4" (ngSubmit)="saveReceipt()">
+          <div><label for="finance-receipt-amount" class="text-sm font-medium">Valor recebido (R$)</label><input hlmInput id="finance-receipt-amount" name="amount" type="number" min="0.01" [max]="row.pending" step="0.01" [(ngModel)]="receiptAmount" required class="mt-2" /></div>
+          <div class="grid gap-3 sm:grid-cols-2"><div><label for="finance-receipt-date" class="text-sm font-medium">Data do recebimento</label><input hlmInput id="finance-receipt-date" name="date" type="date" [(ngModel)]="receiptDate" required class="mt-2" /></div><div><label for="finance-receipt-method" class="text-sm font-medium">Forma de pagamento</label><hlm-native-select class="mt-2 w-full" selectId="finance-receipt-method" name="method" [(ngModel)]="receiptMethod"><option hlmNativeSelectOption value="Não informado">Não informado</option><option hlmNativeSelectOption value="Pix">Pix</option><option hlmNativeSelectOption value="Dinheiro">Dinheiro</option><option hlmNativeSelectOption value="Cartão">Cartão</option><option hlmNativeSelectOption value="Transferência">Transferência</option><option hlmNativeSelectOption value="Outro">Outro</option></hlm-native-select></div></div>
+          <div><label for="finance-receipt-note" class="text-sm font-medium">Observação · opcional</label><input hlmInput id="finance-receipt-note" name="note" [(ngModel)]="receiptNote" maxlength="240" class="mt-2" /></div>
+          @if (receiptError()) { <p role="alert" class="text-sm text-destructive">{{ receiptError() }}</p> }
+          <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="receiptDialog.close()">Cancelar</button><button hlmBtn type="submit">Salvar recebimento</button></hlm-dialog-footer>
+        </form>
+      }
+    </hlm-dialog-content>
+  </hlm-dialog>
+
+  <hlm-dialog #expenseDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar despesa" class="max-h-[90dvh] w-[min(94vw,560px)] max-w-none overflow-auto sm:max-w-none">
+      <hlm-dialog-header><h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Registrar despesa</h2><p hlmDialogDescription class="text-sm text-muted-foreground">Lance uma saída de dinheiro. Registrar despesa não altera o saldo de Insumos.</p></hlm-dialog-header>
+      <form class="space-y-4" (ngSubmit)="saveExpense()">
+        <div><label for="finance-expense-description" class="text-sm font-medium">Descrição</label><input hlmInput id="finance-expense-description" name="description" [(ngModel)]="expenseDescription" required maxlength="120" placeholder="Ex.: Compra de filamento PLA" class="mt-2" /></div>
+        <div class="grid gap-3 sm:grid-cols-2"><div><label for="finance-expense-category" class="text-sm font-medium">Categoria</label><input hlmInput id="finance-expense-category" name="category" [(ngModel)]="expenseCategory" required maxlength="80" placeholder="Ex.: Insumos" class="mt-2" /></div><div><label for="finance-expense-amount" class="text-sm font-medium">Valor pago (R$)</label><input hlmInput id="finance-expense-amount" name="amount" type="number" min="0.01" step="0.01" [(ngModel)]="expenseAmount" required class="mt-2" /></div></div>
+        <div class="grid gap-3 sm:grid-cols-2"><div><label for="finance-expense-date" class="text-sm font-medium">Data do pagamento</label><input hlmInput id="finance-expense-date" name="date" type="date" [(ngModel)]="expenseDate" required class="mt-2" /></div><div><label for="finance-expense-method" class="text-sm font-medium">Forma de pagamento</label><hlm-native-select class="mt-2 w-full" selectId="finance-expense-method" name="method" [(ngModel)]="expenseMethod"><option hlmNativeSelectOption value="Não informado">Não informado</option><option hlmNativeSelectOption value="Pix">Pix</option><option hlmNativeSelectOption value="Dinheiro">Dinheiro</option><option hlmNativeSelectOption value="Cartão">Cartão</option><option hlmNativeSelectOption value="Transferência">Transferência</option><option hlmNativeSelectOption value="Outro">Outro</option></hlm-native-select></div></div>
+        <div><label for="finance-expense-note" class="text-sm font-medium">Observação · opcional</label><input hlmInput id="finance-expense-note" name="note" [(ngModel)]="expenseNote" maxlength="240" class="mt-2" /></div>
+        @if (expenseError()) { <p role="alert" class="text-sm text-destructive">{{ expenseError() }}</p> }
+        <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="expenseDialog.close()">Cancelar</button><button hlmBtn type="submit">Salvar despesa</button></hlm-dialog-footer>
+      </form>
+    </hlm-dialog-content>
+  </hlm-dialog>
+</section>

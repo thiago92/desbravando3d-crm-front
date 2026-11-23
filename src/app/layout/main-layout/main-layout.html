@@ -73,13 +73,13 @@
     </div>
 
     <div hlmSidebarFooter class="border-t border-sidebar-border p-3">
-      <div class="flex items-center gap-3 px-2 py-1 group-data-[collapsible=icon]:justify-center">
-        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground" aria-hidden="true">P</span>
-        <div class="group-data-[collapsible=icon]:hidden">
-          <p class="text-sm font-semibold">Perfil</p>
-          <p class="text-xs text-muted-foreground">Modo prévia</p>
-        </div>
-      </div>
+      <button hlmBtn variant="ghost" type="button" class="h-auto w-full justify-start gap-3 px-2 py-1 text-left group-data-[collapsible=icon]:justify-center" aria-label="Abrir perfil" (click)="openProfile()">
+        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-accent-foreground" aria-hidden="true">{{ profileInitial() }}</span>
+        <span class="min-w-0 group-data-[collapsible=icon]:hidden">
+          <span class="block truncate text-sm font-semibold">{{ user()?.name ?? 'Perfil' }}</span>
+          <span class="block truncate text-xs text-muted-foreground">{{ user()?.profile ?? 'Modo prévia' }}</span>
+        </span>
+      </button>
 
       <div class="px-2 group-data-[collapsible=icon]:hidden" role="group" aria-label="Tema da área interna">
         <p class="mb-2 text-sm font-medium">Tema</p>
@@ -99,6 +99,33 @@
       </ul>
     </div>
   </hlm-sidebar>
+
+  <hlm-dialog #profileDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar perfil" class="w-[min(94vw,540px)] max-w-none sm:max-w-none">
+      <hlm-dialog-header>
+        <h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Meu perfil</h2>
+        <p hlmDialogDescription class="text-sm text-muted-foreground">Dados da conta e acesso ao CRM.</p>
+      </hlm-dialog-header>
+      <div class="space-y-4">
+        <div class="flex items-center gap-3 rounded-xl border border-border p-4">
+          <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground" aria-hidden="true">{{ profileInitial() }}</span>
+          <div class="min-w-0"><p class="font-semibold">{{ user()?.name ?? 'Usuário não identificado' }}</p><p class="text-xs text-muted-foreground">{{ user() ? 'Conta conectada' : 'Acesso livre à prévia' }}</p></div>
+        </div>
+        <dl class="grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl border border-border p-4"><dt class="text-xs text-muted-foreground">Perfil</dt><dd class="mt-1 font-medium">{{ user()?.profile ?? 'Modo prévia' }}</dd></div>
+          <div class="rounded-xl border border-border p-4"><dt class="text-xs text-muted-foreground">E-mail</dt><dd class="mt-1 break-all font-medium">{{ user()?.email ?? 'Não disponível nesta prévia' }}</dd></div>
+        </dl>
+        <section class="rounded-xl border border-border p-4" aria-labelledby="profile-access-heading">
+          <h3 id="profile-access-heading" class="text-sm font-semibold">Acesso às áreas</h3>
+          @if (user()) {
+            @if (accessibleAreas().length) { <p class="mt-2 text-sm text-muted-foreground">{{ accessibleAreas().join(', ') }}</p> }
+            @else { <p class="mt-2 text-sm text-muted-foreground">Nenhuma área liberada para esta conta.</p> }
+          } @else { <p class="mt-2 text-sm text-muted-foreground">A navegação está livre para validar as telas. As permissões serão aplicadas quando o login real estiver integrado.</p> }
+        </section>
+      </div>
+      <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="closeProfile()">Fechar</button></hlm-dialog-footer>
+    </hlm-dialog-content>
+  </hlm-dialog>
 
   <main hlmSidebarInset class="min-w-0">
     <app-top-bar />

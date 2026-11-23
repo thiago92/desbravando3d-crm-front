@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideSpartanHlm } from '@spartan-ng/helm/utils';
 import { Insumos } from './insumos';
 import { FilamentsPreview } from './filaments-preview';
+import { CashLedgerPreview } from '../financeiro/cash-ledger-preview';
 
 describe('Insumos', () => {
   let fixture: ComponentFixture<Insumos>;
@@ -108,5 +109,45 @@ describe('Insumos', () => {
     await fixture.whenStable();
     expect(root().querySelector('[role="dialog"]')).toBeNull();
     expect(TestBed.inject(FilamentsPreview).filaments()[0].balanceGrams).toBe(500);
+  });
+
+  it('registra a compra em formulário separado e mostra kg, preço por kg e saída financeira', async () => {
+    await click('+ Registrar compra');
+    const select = root().querySelector<HTMLSelectElement>('#purchase-filament')!;
+    select.value = 'filament-preview-1';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await fill('purchase-quantity-kg', '1');
+    await fill('purchase-price-kg', '130');
+    await fill('purchase-date', '2026-11-16');
+    expect(root().querySelector('[role="dialog"]')?.textContent).toContain('R$\u00a0130,00');
+    const purchaseForm = root().querySelector('form')!;
+    purchaseForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    purchaseForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(TestBed.inject(FilamentsPreview).filaments()[0]).toMatchObject({ balanceGrams: 1500, pricePerKg: 130 });
+    const expenses = TestBed.inject(CashLedgerPreview).transactions();
+    expect(expenses).toHaveLength(1);
+    expect(expenses[0]).toMatchObject({ kind: 'expense', amount: 130, category: 'Insumos', date: '2026-11-16', purchase: { filamentId: 'filament-preview-1', quantityGrams: 1000, pricePerKg: 130 } });
+    expect(root().querySelector('[aria-labelledby="filament-purchases-heading"]')?.textContent).toContain('1 kg');
+  });
+
+  it('não altera estoque nem caixa quando a compra separada é inválida', async () => {
+    await click('+ Registrar compra');
+    const select = root().querySelector<HTMLSelectElement>('#purchase-filament')!;
+    select.value = 'filament-preview-1';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await fill('purchase-quantity-kg', '1');
+    await fill('purchase-price-kg', '0');
+    root().querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root().querySelector('[role="alert"]')?.textContent).toContain('preço por kg');
+    expect(TestBed.inject(FilamentsPreview).filaments()[0].balanceGrams).toBe(500);
+    expect(TestBed.inject(CashLedgerPreview).transactions()).toHaveLength(0);
   });
 });

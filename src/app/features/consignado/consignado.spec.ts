@@ -1,12 +1,49 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { provideSpartanHlm } from '@spartan-ng/helm/utils';
-import { Consignado } from './consignado';
+import { Consignado, ConsignmentsPreview } from './consignado';
 import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
 import { FilamentsPreview } from '../insumos/filaments-preview';
 import { ProductsPreview } from '../produtos/products-preview';
 
 describe('Consignado: prévia do kanban', () => {
+  it('oferece perda por peça inteira e registro manual na modal', async () => {
+    await TestBed.configureTestingModule({ imports: [Consignado], providers: [provideSpartanHlm()] }).compileComponents();
+    const fixture = TestBed.createComponent(Consignado);
+    document.body.append(fixture.nativeElement);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    document.querySelector<HTMLButtonElement>('[aria-label^="Ver consignação #C-012"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    const whole = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Peça inteira')!;
+    expect(whole.getAttribute('aria-pressed')).toBe('true');
+    expect(dialog.textContent).toContain('Estimativa para 1 peça(s)');
+    const manual = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Informar filamento e gramas')!;
+    manual.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(dialog.querySelector('[name="failureQuantity"]')).toBeNull();
+    expect(dialog.querySelector('#consignment-failure-grams-0')).not.toBeNull();
+  });
+  it('registra falhas sem mudar etapa e baixa filamento adicional apenas na nova tentativa', () => {
+    const service = TestBed.inject(ConsignmentsPreview);
+    const inventory = TestBed.inject(FilamentsPreview);
+    const before = inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!.balanceGrams;
+    const input = { date: '2026-11-16', quantity: 1, reason: 'Falha de adesão', materials: [{ filamentId: 'filament-preview-2', grams: 20 }], hours: 2 };
+    expect(service.recordFailure('#C-012', input)).toMatchObject({ saved: { stage: 'printing', retryPending: true } });
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!.balanceGrams).toBe(before);
+    expect(service.startRetry('#C-012', [{ filamentId: 'filament-preview-2', grams: 9999 }])).toHaveProperty('error');
+    expect(service.startRetry('#C-012', [{ filamentId: 'filament-preview-2', grams: 30 }])).toMatchObject({ saved: { stage: 'printing', retryPending: false } });
+    expect(inventory.filaments().find((entry) => entry.id === 'filament-preview-2')!.balanceGrams).toBe(before - 30);
+    expect(service.recordFailure('#C-013', { ...input, materials: [{ filamentId: 'filament-preview-1', grams: 10 }] })).toMatchObject({ saved: { stage: 'ready', retryPending: true } });
+  });
+  it('registra falha de parte da peça sem contabilizar peça inteira perdida', () => {
+    const service = TestBed.inject(ConsignmentsPreview);
+    const result = service.recordFailure('#C-012', { date: '2026-11-16', quantity: 0, materialMode: 'manual', reason: '', materials: [{ filamentId: 'filament-preview-2', grams: 7.5 }], hours: 1 });
+    expect(result).toMatchObject({ saved: { stage: 'printing', failures: [{ materialMode: 'manual', quantity: 0, materials: [{ grams: 7.5 }] }] } });
+  });
   it('mantém pelo menos 480 px de altura no desktop quando a janela é baixa', async () => {
     await TestBed.configureTestingModule({ imports: [Consignado] }).compileComponents();
     const fixture = TestBed.createComponent(Consignado);
@@ -30,6 +67,29 @@ describe('Consignado: prévia do kanban', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     expect(document.querySelector<HTMLElement>('[role="dialog"]')?.textContent).toContain('Consignação #C-014');
+  });
+
+  it('usa o consumo cadastrado quando o real não é informado e bloqueia edição após confirmar', async () => {
+    await TestBed.configureTestingModule({ imports: [Consignado], providers: [provideSpartanHlm()] }).compileComponents();
+    const inventory = TestBed.inject(FilamentsPreview);
+    const red = inventory.filaments().find((entry) => entry.id === 'filament-preview-1')!;
+    inventory.save({ name: red.name, material: red.material, color: red.color, pricePerKg: red.pricePerKg }, { mode: 'add', grams: 100 }, red.id);
+    const fixture = TestBed.createComponent(Consignado);
+    document.body.append(fixture.nativeElement);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    document.querySelector<HTMLButtonElement>('[aria-label^="Ver consignação #C-010"]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog.querySelector('#consignment-real-consumption')).not.toBeNull();
+    expect(dialog.querySelector('#consignment-real-grams-0')).toBeNull();
+    [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Confirmar consignação')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(inventory.filaments().find((entry) => entry.id === red.id)?.balanceGrams).toBe(0);
+    expect(dialog.querySelector('#consignment-real-consumption')).toBeNull();
+    expect(dialog.textContent).toContain('Confirmadas');
   });
 
   it('cadastra uma consignação na mesma modal e a coloca em Em orçamento', async () => {

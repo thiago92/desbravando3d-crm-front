@@ -119,6 +119,35 @@
           @if (card.filamentConsumptionOverride; as realLines) { <div class="mt-4 rounded-lg border border-border p-3 text-xs"><p class="font-medium">Consumo real informado para baixa no estoque</p>@for (line of realLines; track line.filamentId) { <p class="mt-1">{{ filamentName(line.filamentId) }}: {{ measure(line.grams) }} g no total</p> }</div> }
         </section>
 
+        @if (card.stage === 'printing' || card.stage === 'ready') {
+          <section class="space-y-4 rounded-xl border border-border p-4" aria-labelledby="consignment-failures-heading">
+            <div><h3 id="consignment-failures-heading" class="font-semibold">Falhas de impressão</h3><p class="text-xs text-muted-foreground">A falha não muda a etapa. Material e energia perdidos são custo estimado, sem lançamento no caixa.</p></div>
+            @for (failure of card.failures ?? []; track failure.id) {
+              <div class="rounded-lg bg-muted/50 p-3 text-sm"><p class="font-medium">{{ failure.date }} · {{ failure.materialMode === 'whole' ? failure.quantity + ' peça(s) inteira(s)' : 'parte da peça' }}</p>@if (failure.reason) { <p class="mt-1">{{ failure.reason }}</p> }<p class="mt-1 text-xs text-muted-foreground">{{ failure.materialMode === 'whole' ? 'Peça inteira (cadastro)' : 'Material informado' }} · {{ measure(failure.hours) }} h · material {{ money(failure.materialCost) }} · energia {{ money(failure.energyCost) }} · perda estimada {{ money(failure.totalCost) }}</p>@for (line of failure.materials; track line.filamentId) { <p class="text-xs text-muted-foreground">{{ filamentName(line.filamentId) }}: {{ measure(line.grams) }} g</p> }</div>
+            }
+            @if (card.retryPending) {
+              <form (ngSubmit)="startRetry()" class="space-y-3"><p class="text-sm font-medium">Nova tentativa</p><p class="text-xs text-muted-foreground">O estoque será verificado antes de baixar o filamento adicional.</p>
+                @for (line of retryMaterials; track $index; let lineIndex = $index) { <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"><label class="text-xs">Filamento<hlm-native-select class="mt-1 w-full" [selectId]="'consignment-retry-filament-' + lineIndex" [name]="'retryFilament' + lineIndex" [(ngModel)]="line.filamentId"><option hlmNativeSelectOption value="">Escolha</option>@for (filament of filaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></label><label class="text-xs">Gramas adicionais<input hlmInput class="mt-1" [name]="'retryGrams' + lineIndex" type="number" min="0.01" step="0.01" [(ngModel)]="line.grams" /></label><button hlmBtn variant="ghost" type="button" (click)="removeRetryMaterial(lineIndex)">Remover</button></div> }
+                <button hlmBtn variant="outline" size="sm" type="button" (click)="addRetryMaterial()">Adicionar filamento</button><button hlmBtn type="submit" class="block">Iniciar nova tentativa</button>
+              </form>
+            } @else {
+              <form (ngSubmit)="recordFailure()" class="space-y-3"><p class="text-sm font-medium">Registrar perda</p><div class="grid gap-3 sm:grid-cols-2"><label class="text-xs">Data<input hlmInput class="mt-1" name="failureDate" type="date" [(ngModel)]="failureDate" /></label><label class="text-xs">Horas gastas<input hlmInput class="mt-1" name="failureHours" type="number" min="0.01" step="0.01" [(ngModel)]="failureHours" /></label></div>
+                <div><p class="text-xs">Como registrar o material perdido</p><div class="mt-2 flex flex-wrap gap-2"><button hlmBtn size="sm" type="button" [variant]="failureMaterialMode === 'whole' ? 'default' : 'outline'" [attr.aria-pressed]="failureMaterialMode === 'whole'" (click)="setFailureMaterialMode('whole')">Peça inteira</button><button hlmBtn size="sm" type="button" [variant]="failureMaterialMode === 'manual' ? 'default' : 'outline'" [attr.aria-pressed]="failureMaterialMode === 'manual'" (click)="setFailureMaterialMode('manual')">Informar filamento e gramas</button></div></div>
+                @if (failureMaterialMode === 'whole') {
+                  <label class="block text-xs">Peças inteiras perdidas<input hlmInput class="mt-1" name="failureQuantity" type="number" min="1" [max]="card.quantity" step="1" [(ngModel)]="failureQuantity" (ngModelChange)="failureQuantityChanged()" /></label>
+                  <p class="text-xs text-muted-foreground">Estimativa para {{ failureQuantity }} peça(s), conforme o tamanho cadastrado. A primeira impressão já foi baixada na confirmação quando havia vínculo com tamanho.</p>
+                  @for (line of failureEstimatedMaterials(); track line.filamentId) { <p class="text-xs text-muted-foreground">{{ filamentName(line.filamentId) }}: {{ measure(line.grams) }} g</p> }
+                } @else {
+                <p class="text-xs text-muted-foreground">Para uma parte da peça, informe somente o filamento e as gramas perdidas nesta tentativa, incluindo purga. Nenhuma peça inteira será contabilizada como perdida.</p>
+                @for (line of failureMaterials; track $index; let lineIndex = $index) { <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"><label class="text-xs">Filamento<hlm-native-select class="mt-1 w-full" [selectId]="'consignment-failure-filament-' + lineIndex" [name]="'failureFilament' + lineIndex" [(ngModel)]="line.filamentId"><option hlmNativeSelectOption value="">Escolha</option>@for (filament of filaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></label><label class="text-xs">Gramas perdidas<input hlmInput class="mt-1" [id]="'consignment-failure-grams-' + lineIndex" [name]="'failureGrams' + lineIndex" type="number" min="0.01" step="0.01" [(ngModel)]="line.grams" /></label><button hlmBtn variant="ghost" type="button" (click)="removeFailureMaterial(lineIndex)">Remover</button></div> }
+                <button hlmBtn variant="outline" size="sm" type="button" (click)="addFailureMaterial()">Adicionar filamento</button>
+                }
+                <label class="block text-xs">Motivo (opcional)<input hlmInput class="mt-1" name="failureReason" maxlength="500" [(ngModel)]="failureReason" /></label><button hlmBtn variant="outline" type="submit" class="block">Registrar falha de impressão</button>
+              </form>
+            }
+          </section>
+        }
+
         <section aria-labelledby="consignment-quantities-heading">
           <h3 id="consignment-quantities-heading" class="font-semibold">Unidades</h3>
           <dl class="mt-3 grid gap-3 sm:grid-cols-2">
@@ -161,6 +190,10 @@
             <form class="space-y-3 rounded-xl border border-border p-4" (ngSubmit)="recordPayment()">
               <label for="consignment-payment" class="text-sm font-medium">Valor recebido das vendas (R$)</label>
               <input hlmInput id="consignment-payment" name="paymentAmount" type="number" min="0.01" [max]="pending(card)" step="0.01" [(ngModel)]="paymentAmount" class="mt-2 sm:max-w-xs" />
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="text-sm font-medium">Data do recebimento<input hlmInput name="paymentDate" type="date" [(ngModel)]="paymentDate" required class="mt-2" /></label>
+                <div><label for="consignment-payment-method" class="text-sm font-medium">Forma de pagamento</label><hlm-native-select class="mt-2 w-full" selectId="consignment-payment-method" name="paymentMethod" [(ngModel)]="paymentMethod"><option hlmNativeSelectOption value="Não informado">Não informado</option><option hlmNativeSelectOption value="Pix">Pix</option><option hlmNativeSelectOption value="Dinheiro">Dinheiro</option><option hlmNativeSelectOption value="Cartão">Cartão</option><option hlmNativeSelectOption value="Transferência">Transferência</option><option hlmNativeSelectOption value="Outro">Outro</option></hlm-native-select></div>
+              </div>
               <p class="text-xs text-muted-foreground">Pode ser parte do valor de uma peça. A receber agora: {{ money(pending(card)) }}.</p>
               <button hlmBtn type="submit" [disabled]="pending(card) === 0">Registrar recebimento</button>
             </form>

@@ -4,6 +4,10 @@ import { FilamentsPreview } from '../insumos/filaments-preview';
 import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
 import { ProductsPreview, type ProductSize } from '../produtos/products-preview';
 import { calculateOrderPrice, type OrderPrice } from './order-pricing';
+import { CashLedgerPreview, type PaymentMethodPreview, validMoney } from '../financeiro/cash-ledger-preview';
+import { ContactsPreview } from '../clientes-lojas/contacts-preview';
+import { normalizeSearch } from '../../shared/utils/presentation';
+import { FinishedProductsPreview } from '../produtos/finished-products-preview';
 
 /** Etapas e dados da prévia; o contrato da API ainda será definido. */
 export type OrderStagePreview = 'request' | 'confirmed' | 'printing' | 'ready' | 'delivered';
@@ -20,6 +24,7 @@ export interface OrderPreview {
   id: string;
   number: string;
   customer: string;
+  customerId?: string;
   stage: OrderStagePreview;
   items: OrderItemPreview[];
   discountPercent: number;
@@ -28,10 +33,30 @@ export interface OrderPreview {
   unitStockConsumption?: { supplyId: string; units: number }[];
   deliveryDate: string | null;
   payment: 'not-defined' | 'pending' | 'received';
+  receivedAmount?: number;
+  failures?: PrintFailurePreview[];
+  retryPending?: boolean;
+  cancelledAt?: string;
+  cancelReason?: string;
+}
+
+export interface PrintFailurePreview {
+  id: string;
+  materialMode: 'whole' | 'manual';
+  date: string;
+  itemIndex: number;
+  quantity: number;
+  reason: string;
+  materials: { filamentId: string; grams: number; pricePerKg: number }[];
+  hours: number;
+  energyCost: number;
+  materialCost: number;
+  totalCost: number;
 }
 
 export interface NewOrderPreview {
   customer: string;
+  customerId?: string;
   items: { productId: string; sizeId: string; quantity: number; marginId: number | null }[];
   discountPercent: number;
   deliveryDate: string | null;
@@ -81,6 +106,9 @@ export class OrdersPreview {
   private readonly inventory = inject(FilamentsPreview);
   private readonly unitInventory = inject(UnitSuppliesPreview);
   private readonly catalog = inject(ProductsPreview);
+  private readonly cashLedger = inject(CashLedgerPreview);
+  private readonly contacts = inject(ContactsPreview);
+  private readonly finishedProducts = inject(FinishedProductsPreview);
   private readonly entries = signal<readonly OrderPreview[]>(previewOrders.map((order) => order.stage === 'request' ? order : {
     ...order,
     items: order.items.map((entry) => ({ ...entry, sizeSnapshot: this.copySize(this.catalog.products().find((product) => product.id === entry.productId)?.sizes.find((size) => size.id === entry.sizeId) ?? null) })),
@@ -92,6 +120,28 @@ export class OrdersPreview {
     return order.pricingSnapshot ?? calculateOrderPrice(order, this.catalog.products(), this.inventory.filaments(), latestEnergySetting(), readPercentages(), this.unitInventory.supplies());
   }
 
+  receivedFor(order: OrderPreview): number {
+    return order.receivedAmount ?? (order.payment === 'received' ? this.priceFor(order)?.total ?? 0 : 0);
+  }
+
+  pendingFor(order: OrderPreview): number {
+    if (order.stage === 'request' || order.cancelledAt) return 0;
+    return Math.max(0, Math.round(((this.priceFor(order)?.total ?? 0) - this.receivedFor(order)) * 100) / 100);
+  }
+
+  recordPayment(id: string, amount: number, date: string, method: PaymentMethodPreview, note = ''): OrderMutationResult {
+    const order = this.entries().find((entry) => entry.id === id);
+    if (!order || order.stage === 'request' || order.cancelledAt) return { error: 'Confirme uma encomenda ativa antes de registrar um recebimento.' };
+    const total = this.priceFor(order)?.total;
+    if (total == null) return { error: 'O valor da encomenda não está disponível.' };
+    const pending = this.pendingFor(order);
+    if (!validMoney(amount) || amount > pending) return { error: 'Informe um valor maior que zero e até o saldo pendente, com duas casas decimais.' };
+    const receipt = this.cashLedger.addReceipt({ date, amount, origin: 'order', reference: order.number, party: order.customer, method, note });
+    if ('error' in receipt) return receipt;
+    const receivedAmount = Math.round((this.receivedFor(order) + amount) * 100) / 100;
+    return this.update({ ...order, receivedAmount, payment: receivedAmount >= total ? 'received' : 'pending' });
+  }
+
   sizeFor(item: OrderItemPreview): ProductSize | null {
     return item.sizeSnapshot ?? this.catalog.products().find((product) => product.id === item.productId)?.sizes.find((size) => size.id === item.sizeId) ?? null;
   }
@@ -99,6 +149,8 @@ export class OrdersPreview {
   create(input: NewOrderPreview): OrderMutationResult {
     const customer = input.customer.trim();
     if (!customer) return { error: 'Informe o nome do cliente.' };
+    const selectedContact = input.customerId ? this.contacts.contacts().find((contact) => contact.id === input.customerId) : this.contacts.contacts().find((contact) => normalizeSearch(contact.name) === normalizeSearch(customer));
+    if (input.customerId && (!selectedContact || normalizeSearch(selectedContact.name) !== normalizeSearch(customer))) return { error: 'O contato selecionado não corresponde ao cliente informado.' };
     if (!input.items.length) return { error: 'Adicione pelo menos um produto à encomenda.' };
     if (!validHundredth(input.discountPercent) || input.discountPercent > 100) return { error: 'Informe um desconto de 0% a 100%, com até duas casas decimais.' };
     if (input.deliveryDate !== null && !validDeliveryDate(input.deliveryDate)) return { error: 'Informe uma data válida para a entrega.' };
@@ -115,7 +167,7 @@ export class OrdersPreview {
     }
     const nextNumber = Math.max(0, ...this.entries().map((order) => Number(order.number.replace(/^#/, '')) || 0)) + 1;
     const saved: OrderPreview = {
-      id: crypto.randomUUID(), number: `#${String(nextNumber).padStart(3, '0')}`, customer,
+      id: crypto.randomUUID(), number: `#${String(nextNumber).padStart(3, '0')}`, customer, customerId: selectedContact?.id,
       stage: 'request', items, discountPercent: input.discountPercent, pricingSnapshot: null,
       deliveryDate: input.deliveryDate, payment: 'not-defined',
     };
@@ -125,14 +177,14 @@ export class OrdersPreview {
 
   saveDiscount(id: string, percent: number): OrderMutationResult {
     const order = this.entries().find((entry) => entry.id === id);
-    if (!order || order.stage !== 'request') return { error: 'O desconto só pode ser alterado antes da confirmação.' };
+    if (!order || order.stage !== 'request' || order.cancelledAt) return { error: 'O desconto só pode ser alterado em orçamentos ativos.' };
     if (!validHundredth(percent) || percent > 100) return { error: 'Informe um desconto de 0% a 100%, com até duas casas decimais.' };
     return this.update({ ...order, discountPercent: percent });
   }
 
   saveDeliveryDate(id: string, date: string | null): OrderMutationResult {
     const order = this.entries().find((entry) => entry.id === id);
-    if (!order || order.stage !== 'request') return { error: 'O prazo só pode ser alterado antes da confirmação nesta prévia.' };
+    if (!order || order.stage !== 'request' || order.cancelledAt) return { error: 'O prazo só pode ser alterado em orçamentos ativos.' };
     if (date !== null) {
       const parsed = new Date(`${date}T12:00:00`);
       const normalized = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
@@ -143,7 +195,7 @@ export class OrdersPreview {
 
   saveItemSelection(id: string, index: number, sizeId: string, marginId: number | null): OrderMutationResult {
     const order = this.entries().find((entry) => entry.id === id);
-    if (!order || order.stage !== 'request' || !order.items[index]) return { error: 'A precificação só pode ser alterada antes da confirmação.' };
+    if (!order || order.stage !== 'request' || order.cancelledAt || !order.items[index]) return { error: 'A precificação só pode ser alterada em orçamentos ativos.' };
     const product = this.catalog.products().find((entry) => entry.id === order.items[index].productId);
     if (!product?.sizes.some((size) => size.id === sizeId)) return { error: 'Escolha um tamanho cadastrado para o produto.' };
     if (!readPercentages().some((entry) => entry.id === marginId)) return { error: 'Escolha uma margem cadastrada em Precificação.' };
@@ -153,7 +205,7 @@ export class OrdersPreview {
 
   saveItemConsumption(id: string, index: number, lines: { filamentId: string; grams: number }[] | null): OrderMutationResult {
     const order = this.entries().find((entry) => entry.id === id);
-    if (!order || order.stage !== 'request' || !order.items[index]) return { error: 'O consumo de estoque só pode ser alterado antes da confirmação.' };
+    if (!order || order.stage !== 'request' || order.cancelledAt || !order.items[index]) return { error: 'O consumo de estoque só pode ser alterado em orçamentos ativos.' };
     if (lines !== null) {
       if (!lines.length || lines.some((line) => !this.inventory.filaments().some((filament) => filament.id === line.filamentId) || !validHundredth(line.grams) || line.grams <= 0) || new Set(lines.map((line) => line.filamentId)).size !== lines.length) {
         return { error: 'Informe pelo menos um filamento cadastrado, com gramas positivas e até duas casas decimais, sem repetições.' };
@@ -165,7 +217,8 @@ export class OrdersPreview {
 
   advance(id: string, target: OrderStagePreview): OrderMutationResult {
     const order = this.entries().find((entry) => entry.id === id);
-    if (!order || nextOrderAction[order.stage]?.target !== target) return { error: 'Esta mudança de etapa não está disponível para a encomenda.' };
+    if (!order || order.cancelledAt || nextOrderAction[order.stage]?.target !== target) return { error: 'Esta mudança de etapa não está disponível para a encomenda.' };
+    if (order.retryPending) return { error: 'Inicie uma nova tentativa antes de avançar a encomenda.' };
     if (target === 'confirmed') {
       const price = this.priceFor(order);
       if (!price) return { error: 'Complete a precificação dos produtos e cadastre energia e margens antes de confirmar.' };
@@ -197,19 +250,77 @@ export class OrdersPreview {
     return this.update({ ...order, stage: target });
   }
 
+  recordFailure(id: string, input: { date: string; itemIndex: number; quantity: number; reason: string; materialMode?: 'whole' | 'manual'; materials: { filamentId: string; grams: number }[]; hours: number }): OrderMutationResult {
+    const order = this.entries().find((entry) => entry.id === id);
+    if (!order || order.cancelledAt || !['printing', 'ready'].includes(order.stage) || order.retryPending) return { error: 'A falha só pode ser registrada em uma encomenda ativa, em impressão ou pronta para entrega.' };
+    const item = order.items[input.itemIndex];
+    if (!item || !Number.isSafeInteger(input.quantity) || (input.materialMode === 'manual' ? input.quantity !== 0 : input.quantity < 1 || input.quantity > item.quantity)) return { error: 'Escolha o item e uma quantidade válida de peças perdidas.' };
+    if (!validDeliveryDate(input.date)) return { error: 'Informe uma data válida para a falha.' };
+    if (!validHundredth(input.hours) || input.hours <= 0) return { error: 'Informe as horas gastas, maiores que zero e com até duas casas decimais.' };
+    if (!input.materials.length || input.materials.some((line) => !this.inventory.filaments().some((filament) => filament.id === line.filamentId) || !validHundredth(line.grams) || line.grams <= 0) || new Set(input.materials.map((line) => line.filamentId)).size !== input.materials.length) return { error: 'Informe filamentos distintos e gramas positivas, com até duas casas decimais.' };
+    const materials = input.materials.map((line) => ({ ...line, pricePerKg: this.inventory.filaments().find((filament) => filament.id === line.filamentId)!.pricePerKg }));
+    const materialCost = Math.round(materials.reduce((sum, line) => sum + line.grams * line.pricePerKg / 1000, 0) * 100) / 100;
+    const energy = order.pricingSnapshot ?? this.priceFor(order);
+    const energyCost = Math.round(((energy?.averagePowerW ?? 0) / 1000) * input.hours * (energy?.tariffPerKwh ?? 0) * 100) / 100;
+    const failure: PrintFailurePreview = { id: crypto.randomUUID(), materialMode: input.materialMode ?? 'whole', date: input.date, itemIndex: input.itemIndex, quantity: input.quantity, reason: input.reason.trim().slice(0, 500), materials, hours: input.hours, materialCost, energyCost, totalCost: Math.round((materialCost + energyCost) * 100) / 100 };
+    return this.update({ ...order, failures: [...(order.failures ?? []), failure], retryPending: true });
+  }
+
+  startRetry(id: string, materials: { filamentId: string; grams: number }[]): OrderMutationResult {
+    const order = this.entries().find((entry) => entry.id === id);
+    if (!order || order.cancelledAt || !['printing', 'ready'].includes(order.stage) || !order.retryPending) return { error: 'Registre uma falha antes de iniciar uma nova tentativa.' };
+    if (!materials.length || materials.some((line) => !validHundredth(line.grams) || line.grams <= 0) || new Set(materials.map((line) => line.filamentId)).size !== materials.length) return { error: 'Informe filamentos distintos e gramas positivas para a nova tentativa.' };
+    const requirements = new Map(materials.map((line) => [line.filamentId, line.grams]));
+    const result = this.inventory.consume(requirements);
+    if ('error' in result) return result;
+    return this.update({ ...order, retryPending: false });
+  }
+
+  cancelOrder(id: string, reason: string): OrderMutationResult {
+    const order = this.entries().find((entry) => entry.id === id);
+    if (!order || order.stage === 'delivered' || order.cancelledAt) return { error: 'A encomenda entregue ou já cancelada não pode ser cancelada.' };
+    if (reason.trim().length > 500) return { error: 'O motivo deve ter até 500 caracteres.' };
+    if (order.stage === 'confirmed') {
+      const restored = this.restoreConfirmationConsumption(order);
+      if ('error' in restored) return restored;
+    }
+    if (order.stage === 'ready') {
+      const unresolved = order.retryPending ? order.failures?.at(-1) : undefined;
+      this.finishedProducts.add(order.items.flatMap((item, index) => {
+        const quantity = unresolved?.itemIndex === index && unresolved.materialMode === 'manual' ? 0 : item.quantity - (unresolved?.itemIndex === index ? unresolved.quantity : 0);
+        return quantity > 0 ? [{ productId: item.productId, sizeId: item.sizeId, quantity }] : [];
+      }));
+    }
+    const date = new Date();
+    const cancelledAt = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return this.update({ ...order, cancelledAt, cancelReason: reason.trim(), pricingSnapshot: this.priceFor(order), stockConsumption: order.stage === 'confirmed' ? undefined : order.stockConsumption, unitStockConsumption: order.stage === 'confirmed' ? undefined : order.unitStockConsumption });
+  }
+
   returnToQuote(id: string): OrderMutationResult {
     const order = this.entries().find((entry) => entry.id === id);
     if (!order || order.stage !== 'confirmed') return { error: 'Somente encomendas confirmadas podem voltar para Em orçamento.' };
+    if (this.receivedFor(order) > 0) return { error: 'Esta encomenda já tem valor recebido. O estorno financeiro precisa ser definido antes de voltar para Em orçamento.' };
     // Os exemplos já confirmados não efetuaram baixa nesta visita.
-    if (order.stockConsumption?.length) {
-      const result = this.inventory.restore(new Map(order.stockConsumption.map(({ filamentId, grams }) => [filamentId, grams])));
-      if ('error' in result) return result;
-    }
-    if (order.unitStockConsumption?.length) {
-      const result = this.unitInventory.restore(new Map(order.unitStockConsumption.map(({ supplyId, units }) => [supplyId, units])));
-      if ('error' in result) return result;
-    }
+    const restored = this.restoreConfirmationConsumption(order);
+    if ('error' in restored) return restored;
     return this.update({ ...order, stage: 'request', pricingSnapshot: null, stockConsumption: undefined, unitStockConsumption: undefined, items: order.items.map((entry) => ({ ...entry, sizeSnapshot: null })) });
+  }
+
+  private restoreConfirmationConsumption(order: OrderPreview): { restored: true } | { error: string } {
+    const units = new Map((order.unitStockConsumption ?? []).map(({ supplyId, units }) => [supplyId, units]));
+    const filaments = new Map((order.stockConsumption ?? []).map(({ filamentId, grams }) => [filamentId, grams]));
+    if (units.size) {
+      const result = this.unitInventory.restore(units);
+      if ('error' in result) return result;
+    }
+    if (filaments.size) {
+      const result = this.inventory.restore(filaments);
+      if ('error' in result) {
+        if (units.size) this.unitInventory.consume(units);
+        return result;
+      }
+    }
+    return { restored: true };
   }
 
   private update(saved: OrderPreview): OrderMutationResult {

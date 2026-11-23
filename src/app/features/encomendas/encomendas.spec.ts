@@ -79,6 +79,79 @@ describe('Encomendas: prévia do kanban', () => {
     await fixture.whenStable();
   }
 
+  it('fecha a modal de encomenda em impressão mesmo quando o seletor de produto é limpo', async () => {
+    await openOrder('#009');
+    expect(root.querySelector('[role="dialog"] #failure-item')).not.toBeNull();
+    (fixture.componentInstance as unknown as { failureItemIndex: number | undefined }).failureItemIndex = undefined;
+    fixture.detectChanges();
+    await clickText('Fechar');
+    expect(root.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('registra peça inteira pelo consumo cadastrado para a quantidade perdida', async () => {
+    const orders = TestBed.inject(OrdersPreview);
+    const catalog = TestBed.inject(ProductsPreview);
+    await openOrder('#009');
+    const wholeButton = [...root.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Peça inteira')!;
+    expect(wholeButton.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.componentInstance['failureMaterialMode']).toBe('whole');
+    const quantity = root.querySelector<HTMLInputElement>('[name="failureQuantity"]')!;
+    quantity.value = '2';
+    quantity.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await clickText('Registrar falha de impressão');
+    const wholeFailure = orders.orders().find((order) => order.number === '#009')!.failures!.at(-1)!;
+    expect(wholeFailure.materialMode).toBe('whole');
+    const size = catalog.products().find((product) => product.id === 'preview-2')!.sizes.find((option) => option.id === 'stand-standard')!;
+    expect(wholeFailure.materials).toEqual(size.materials.map((line) => expect.objectContaining({ filamentId: line.filamentId, grams: line.gramsPerUnit * 2 })));
+
+  });
+
+  it('permite informar filamento e gramas perdidas manualmente', async () => {
+    const orders = TestBed.inject(OrdersPreview);
+    await openOrder('#008');
+    await clickText('Informar filamento e gramas');
+    expect(root.querySelector('[name="failureQuantity"]')).toBeNull();
+    const filament = root.querySelector<HTMLSelectElement>('#failure-filament-0')!;
+    filament.value = 'filament-preview-1';
+    filament.dispatchEvent(new Event('change'));
+    const grams = root.querySelector<HTMLInputElement>('#failure-grams-0')!;
+    grams.value = '7.5';
+    grams.dispatchEvent(new Event('input'));
+    const hours = root.querySelector<HTMLInputElement>('[name="failureHours"]')!;
+    hours.value = '1';
+    hours.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await clickText('Registrar falha de impressão');
+    const manualFailure = orders.orders().find((order) => order.number === '#008')!.failures!.at(-1)!;
+    expect(manualFailure.materialMode).toBe('manual');
+    expect(manualFailure.quantity).toBe(0);
+    expect(manualFailure.materials[0].grams).toBe(7.5);
+  });
+
+  it('mantém a encomenda cancelada consultável fora das cinco colunas', async () => {
+    await openOrder('#013');
+    const reason = root.querySelector<HTMLInputElement>('#order-cancel-reason')!;
+    reason.value = 'Cliente desistiu';
+    reason.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await clickText('Cancelar encomenda');
+    expect(root.querySelectorAll('.kanban-column')).toHaveLength(5);
+    expect(root.querySelectorAll('.order-card')).toHaveLength(9);
+    const cancelled = root.querySelector<HTMLElement>('[aria-labelledby="cancelled-orders-heading"]')!;
+    expect(cancelled.textContent).toContain('#013');
+    cancelled.querySelector<HTMLButtonElement>('button')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;
+    expect(dialog.textContent).toContain('Cancelada');
+    expect(dialog.textContent).toContain('Cliente desistiu');
+    expect(dialog.querySelector('#order-discount')).toBeNull();
+  });
+
   it('mostra campos de consumo real somente ao marcar cada produto e mantém o preço', async () => {
     await openOrder('#013');
     const dialog = root.querySelector<HTMLElement>('[role="dialog"]')!;

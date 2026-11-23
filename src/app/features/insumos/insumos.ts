@@ -3,22 +3,27 @@ import { FormsModule } from '@angular/forms';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmDialog, HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { formatMeasure, formatMoney, normalizeSearch } from '../../shared/utils/presentation';
 import { FilamentPreview, FilamentsPreview, StockMode, calculateStockBalance } from './filaments-preview';
 import { UnitSupplyPreview, UnitSuppliesPreview, UnitStockMode, calculateUnitStockBalance } from './unit-supplies-preview';
+import { type PaymentMethodPreview } from '../financeiro/cash-ledger-preview';
+import { FilamentPurchasesPreview } from './filament-purchases-preview';
 
 @Component({
   selector: 'app-insumos',
-  imports: [FormsModule, HlmButton, HlmInput, ...HlmDialogImports, ...HlmTableImports, ...HlmToggleGroupImports],
+  imports: [FormsModule, HlmButton, HlmInput, ...HlmDialogImports, ...HlmNativeSelectImports, ...HlmTableImports, ...HlmToggleGroupImports],
   templateUrl: './insumos.html',
 })
 export class Insumos {
   @ViewChild('filamentDialog') private dialog?: HlmDialog;
   @ViewChild('unitDialog') private unitDialog?: HlmDialog;
+  @ViewChild('purchaseDialog') private purchaseDialog?: HlmDialog;
   private readonly inventory = inject(FilamentsPreview);
   private readonly unitInventory = inject(UnitSuppliesPreview);
+  private readonly purchasePreview = inject(FilamentPurchasesPreview);
   protected readonly query = signal('');
   protected readonly selected = signal<FilamentPreview | null>(null);
   protected readonly mode = signal<StockMode>('add');
@@ -30,6 +35,7 @@ export class Insumos {
     const term = normalizeSearch(this.query().trim());
     return this.inventory.filaments().filter((item) => [item.name, item.material, item.color].some((value) => normalizeSearch(value).includes(term)));
   });
+  protected readonly allFilaments = this.inventory.filaments;
   protected readonly units = computed(() => {
     const term = normalizeSearch(this.query().trim());
     return this.unitInventory.supplies().filter((item) => normalizeSearch(item.name).includes(term));
@@ -43,6 +49,14 @@ export class Insumos {
   protected material = '';
   protected color = '';
   protected pricePerKg: number | null = null;
+  protected purchaseFilamentId = '';
+  protected purchaseQuantityKg: number | null = null;
+  protected purchasePricePerKg: number | null = null;
+  protected purchaseDate = new Date().toLocaleDateString('en-CA');
+  protected purchaseMethod: PaymentMethodPreview = 'Pix';
+  protected readonly purchaseError = signal('');
+  protected readonly purchaseSaved = signal(false);
+  protected readonly purchases = this.purchasePreview.purchases;
   protected readonly selectedUnit = signal<UnitSupplyPreview | null>(null);
   protected readonly unitMode = signal<UnitStockMode>('add');
   protected readonly unitQuantity = signal<number | null>(null);
@@ -116,5 +130,25 @@ export class Insumos {
     this.saved.set(true);
     this.notice.set(`${result.saved.name} ${this.selected() ? 'atualizado' : 'cadastrado'}. Saldo disponível: ${this.measure(result.saved.balanceGrams)} g.`);
     this.close();
+  }
+
+  protected openPurchase(item?: FilamentPreview): void {
+    this.purchaseFilamentId = item?.id ?? '';
+    this.purchaseQuantityKg = null;
+    this.purchasePricePerKg = item?.pricePerKg ?? null;
+    this.purchaseDate = new Date().toLocaleDateString('en-CA');
+    this.purchaseMethod = 'Pix';
+    this.purchaseError.set('');
+    this.purchaseSaved.set(false);
+    this.purchaseDialog?.open();
+  }
+
+  protected savePurchase(): void {
+    if (this.purchaseSaved()) return;
+    const result = this.purchasePreview.record({ filamentId: this.purchaseFilamentId, quantityKg: this.purchaseQuantityKg!, pricePerKg: this.purchasePricePerKg!, date: this.purchaseDate, paymentMethod: this.purchaseMethod });
+    if ('error' in result) { this.purchaseError.set(result.error); return; }
+    this.purchaseSaved.set(true);
+    this.notice.set(`Compra de ${result.saved.filamentName}: ${this.measure(result.saved.quantityGrams)} g adicionados ao estoque e ${this.money(result.saved.amount)} registrados no Financeiro.`);
+    this.purchaseDialog?.close();
   }
 }

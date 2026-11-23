@@ -5,7 +5,7 @@
       <h1 class="text-3xl font-semibold tracking-tight">Insumos</h1>
       <p class="mt-3 text-sm leading-6 text-muted-foreground">Acompanhe filamentos em gramas e outros insumos em unidades.</p>
     </div>
-    <div class="flex flex-wrap gap-2"><button hlmBtn type="button" (click)="open()">+ Cadastrar filamento</button><button hlmBtn variant="outline" type="button" (click)="openUnit()">+ Cadastrar insumo por unidade</button></div>
+    <div class="flex flex-wrap gap-2"><button hlmBtn type="button" (click)="open()">+ Cadastrar filamento</button><button hlmBtn variant="outline" type="button" (click)="openPurchase()">+ Registrar compra</button><button hlmBtn variant="outline" type="button" (click)="openUnit()">+ Cadastrar insumo por unidade</button></div>
   </div>
   <p class="mt-4 text-xs leading-5 text-muted-foreground">Estoque de exemplo. As alterações ficam apenas nesta visita e são reiniciadas ao recarregar a página.</p>
 
@@ -38,7 +38,7 @@
               <td hlmTd class="px-5 py-4">{{ item.color }}</td>
               <td hlmTd class="px-5 py-4 text-right tabular-nums">{{ measure(item.balanceGrams) }} g</td>
               <td hlmTd class="px-5 py-4 text-right tabular-nums">{{ money(item.pricePerKg) }}</td>
-              <td hlmTd class="px-5 py-4 text-right"><button hlmBtn variant="outline" type="button" [attr.aria-label]="'Editar ' + item.name" (click)="open(item)">Editar estoque</button></td>
+              <td hlmTd class="px-5 py-4 text-right"><div class="flex justify-end gap-2"><button hlmBtn variant="outline" type="button" [attr.aria-label]="'Comprar ' + item.name" (click)="openPurchase(item)">Registrar compra</button><button hlmBtn variant="outline" type="button" [attr.aria-label]="'Editar ' + item.name" (click)="open(item)">Editar estoque</button></div></td>
             </tr>
           }
         </tbody>
@@ -50,6 +50,13 @@
       <p class="mt-2 text-sm text-muted-foreground">Tente outro nome, material ou cor, ou cadastre um filamento.</p>
       @if (query()) { <button hlmBtn variant="ghost" class="mt-4" type="button" (click)="query.set('')">Limpar pesquisa</button> }
     </div>
+  }
+
+  @if (purchases().length) {
+    <section class="mt-6 rounded-2xl border border-border bg-card p-5" aria-labelledby="filament-purchases-heading">
+      <h2 id="filament-purchases-heading" class="font-semibold">Compras de filamento nesta visita</h2>
+      <ul class="mt-3 divide-y divide-border text-sm">@for (purchase of purchases(); track purchase.id) { <li class="flex flex-wrap justify-between gap-2 py-2"><span>{{ purchase.date }} · {{ purchase.filamentName }} · {{ measure(purchase.quantityGrams / 1000) }} kg × {{ money(purchase.pricePerKg) }}/kg</span><strong>{{ money(purchase.amount) }}</strong></li> }</ul>
+    </section>
   }
 
   <h2 class="mt-9 text-xl font-semibold">Insumos por unidade</h2>
@@ -100,10 +107,10 @@
               <button hlmToggleGroupItem value="replace">Corrigir saldo total</button>
             </hlm-toggle-group>
           }
-          <label for="filament-quantity" class="mt-4 block text-sm font-medium">{{ !selected() ? 'Saldo inicial (g)' : mode() === 'add' ? 'Quantidade comprada a adicionar (g)' : 'Novo saldo total (g)' }}</label>
+          <label for="filament-quantity" class="mt-4 block text-sm font-medium">{{ !selected() ? 'Saldo inicial (g)' : mode() === 'add' ? 'Quantidade a adicionar (g)' : 'Novo saldo total (g)' }}</label>
           <input hlmInput id="filament-quantity" name="quantity" type="number" [ngModel]="quantity()" (ngModelChange)="quantity.set($event)" [required]="!selected() || mode() === 'replace'" min="0" step="0.01" class="mt-2" aria-describedby="filament-quantity-help" />
           <p id="filament-quantity-help" class="mt-2 text-xs leading-5 text-muted-foreground">
-            {{ !selected() ? 'Informe a quantidade disponível em gramas. Pode ser zero.' : mode() === 'add' ? 'Informe somente o que comprou. Ex.: 500 g em estoque + 1.000 g de entrada = 1.500 g. Deixe em branco para manter o saldo.' : 'Este valor substitui todo o saldo atual. Use para corrigir a quantidade disponível, inclusive para zero.' }}
+            {{ !selected() ? 'Informe a quantidade disponível em gramas. Pode ser zero.' : mode() === 'add' ? 'Ajuste manual: soma ao saldo sem registrar compra no Financeiro. Para compras pagas, use Registrar compra. Deixe em branco para manter o saldo.' : 'Este valor substitui todo o saldo atual. Use para corrigir a quantidade disponível, inclusive para zero.' }}
           </p>
           @if (nextBalance() !== null) {
             <p class="mt-4 rounded-lg bg-secondary p-3 text-sm" aria-live="polite" data-balance-preview>Saldo após salvar: <strong>{{ measure(nextBalance()!) }} g</strong></p>
@@ -114,6 +121,19 @@
           <button hlmBtn variant="outline" type="button" (click)="close()">Cancelar</button>
           <button hlmBtn type="submit" [disabled]="saved()">{{ selected() ? 'Salvar alterações' : 'Cadastrar filamento' }}</button>
         </hlm-dialog-footer>
+      </form>
+    </hlm-dialog-content>
+  </hlm-dialog>
+  <hlm-dialog #purchaseDialog autoFocus="dialog">
+    <hlm-dialog-content *hlmDialogPortal closeLabel="Fechar compra de filamento" class="max-h-[90dvh] w-[min(94vw,640px)] max-w-none overflow-auto sm:max-w-none">
+      <hlm-dialog-header><h2 hlmDialogTitle class="pr-8 text-xl font-semibold">Registrar compra de filamento</h2><p hlmDialogDescription class="text-sm text-muted-foreground">A compra soma o filamento ao estoque, atualiza o preço por kg usado nos próximos orçamentos e registra a saída de caixa.</p></hlm-dialog-header>
+      <form (ngSubmit)="savePurchase()" class="space-y-4">
+        <div><label for="purchase-filament" class="text-sm font-medium">Filamento</label><hlm-native-select class="mt-2 w-full" selectId="purchase-filament" name="purchaseFilament" [(ngModel)]="purchaseFilamentId"><option hlmNativeSelectOption value="">Escolha o filamento cadastrado</option>@for (filament of allFilaments(); track filament.id) { <option hlmNativeSelectOption [value]="filament.id">{{ filament.material }} {{ filament.color }}</option> }</hlm-native-select></div>
+        <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium">Quantidade comprada (kg)<input hlmInput id="purchase-quantity-kg" name="purchaseQuantityKg" type="number" min="0.001" step="0.001" [(ngModel)]="purchaseQuantityKg" required class="mt-2" /></label><label class="text-sm font-medium">Preço pago por kg (R$)<input hlmInput id="purchase-price-kg" name="purchasePriceKg" type="number" min="0.01" step="0.01" [(ngModel)]="purchasePricePerKg" required class="mt-2" /></label></div>
+        <p class="rounded-lg bg-secondary p-3 text-sm">Saída de caixa prevista: <strong>{{ money((purchaseQuantityKg ?? 0) * (purchasePricePerKg ?? 0)) }}</strong></p>
+        <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium">Data do pagamento<input hlmInput id="purchase-date" name="purchaseDate" type="date" [(ngModel)]="purchaseDate" required class="mt-2" /></label><div><label for="purchase-method" class="text-sm font-medium">Forma de pagamento</label><hlm-native-select class="mt-2 w-full" selectId="purchase-method" name="purchaseMethod" [(ngModel)]="purchaseMethod"><option hlmNativeSelectOption value="Pix">Pix</option><option hlmNativeSelectOption value="Dinheiro">Dinheiro</option><option hlmNativeSelectOption value="Cartão">Cartão</option><option hlmNativeSelectOption value="Transferência">Transferência</option><option hlmNativeSelectOption value="Outro">Outro</option><option hlmNativeSelectOption value="Não informado">Não informado</option></hlm-native-select></div></div>
+        @if (purchaseError()) { <p role="alert" class="text-sm text-destructive">{{ purchaseError() }}</p> }
+        <hlm-dialog-footer><button hlmBtn variant="outline" type="button" (click)="purchaseDialog.close()">Cancelar</button><button hlmBtn type="submit" [disabled]="purchaseSaved()">Registrar compra</button></hlm-dialog-footer>
       </form>
     </hlm-dialog-content>
   </hlm-dialog>

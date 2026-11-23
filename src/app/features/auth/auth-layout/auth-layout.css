@@ -42,12 +42,10 @@
   background: #0569db;
 }
 
-.brand-mark {
-  background: linear-gradient(115deg, #8b37bc 0%, #593fc9 55%, #256bd7 100%);
-}
-
 .brand-logo {
-  mix-blend-mode: screen;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 16px 36px rgb(9 5 28 / 28%));
 }
 
 .form-panel {
@@ -56,6 +54,6 @@
 
 @media (max-width: 1023px) {
   .brand-logo {
-    max-width: 24rem;
+    max-width: 25rem;
   }
 }

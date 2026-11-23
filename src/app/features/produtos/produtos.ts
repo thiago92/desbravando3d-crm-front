@@ -13,6 +13,7 @@ import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmNativeSelectImports } from '@spartan-ng/helm/native-select';
 import { FilamentsPreview } from '../insumos/filaments-preview';
 import { UnitSuppliesPreview } from '../insumos/unit-supplies-preview';
+import { FinishedProductsPreview } from './finished-products-preview';
 import { PrintCalculator } from '../calculadora/print-calculator/print-calculator';
 import { formatMeasure, formatMoney, normalizeSearch } from '../../shared/utils/presentation';
 
@@ -28,6 +29,7 @@ export class Produtos {
   private readonly catalog = inject(ProductsPreview);
   private readonly inventory = inject(FilamentsPreview);
   private readonly unitInventory = inject(UnitSuppliesPreview);
+  protected readonly finishedProducts = inject(FinishedProductsPreview);
   protected readonly filaments = this.inventory.filaments;
   protected readonly unitSupplies = this.unitInventory.supplies;
   protected readonly query = signal('');
@@ -161,6 +163,11 @@ export class Produtos {
   protected save(): void {
     if (this.readingImage()) return;
     if (!this.name.trim()) { this.error.set('Informe o nome do produto.'); return; }
+    const current = this.selected();
+    if (current?.sizes.some((size) => this.finishedProducts.quantity(current.id, size.id) > 0 && !this.sizes.some((entry) => entry.id === size.id))) {
+      this.error.set('Não remova um tamanho com peças prontas em estoque.');
+      return;
+    }
     if (this.sizes.some((size) => !size.name.trim() || [size.heightCm, size.widthCm, size.depthCm, size.price].some((value) => value === null || !Number.isFinite(value) || value <= 0))) {
       this.error.set('Preencha o nome, as três medidas e o preço de cada tamanho com valores maiores que zero.');
       return;
